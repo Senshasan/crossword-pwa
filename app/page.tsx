@@ -4,12 +4,57 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { BookOpen, Check, ChevronLeft, ChevronRight, Clock3, Grid2X2, LogOut, Moon, RotateCcw, Sun, Users, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { sampleCustom, sampleStandard, type Clue, type Direction, type PuzzleData } from '@/lib/crossword'
+import { type Clue, type Direction, type PuzzleData } from '@/lib/crossword'
 
-const puzzles = [sampleStandard, sampleCustom]
-const allCells = (p: PuzzleData) => p.grid.flat().filter((cell) => !cell.isBlocked)
+type ProgressRow = {
+  puzzle_id: string
+  cell_state: string[]
+  completed: boolean
+  solve_time_seconds: number | null
+  completed_at: string | null
+  updated_at: string
+}
+
+type PuzzleRow = {
+  id: string
+  title: string
+  puzzle_type: 'standard' | 'custom'
+  order_index: number
+  width: number
+  height: number
+  grid: string[]
+  clues: { across: Clue[]; down: Clue[] }
+}
+
+function mapPuzzle(row: PuzzleRow): PuzzleData {
+  return {
+    id: row.id,
+    title: row.title,
+    category: row.puzzle_type,
+    orderIndex: row.order_index,
+    dimensions: { rows: row.height, cols: row.width },
+    clues: row.clues,
+    grid: Array.from({ length: row.height }, (_, rowIndex) => Array.from({ length: row.width }, (_, colIndex) => {
+      const letter = row.grid[rowIndex * row.width + colIndex] ?? ''
+      return { row: rowIndex, col: colIndex, letter, isBlocked: letter === '#', clueNumber: undefined }
+    })),
+  }
+} 
+
+function answersFromState(puzzle: PuzzleData, cellState: string[]) {
+  return puzzle.grid.flat().reduce<Record<string, string>>((result, cell, index) => {
+    if (!cell.isBlocked && cellState[index]) result[keyFor(cell.row, cell.col)] = cellState[index]
+    return result
+  }, {})
+} 
+
+function cellStateFor(puzzle: PuzzleData, answers: Record<string, string>) {
+  return puzzle.grid.flat().map((cell) => cell.isBlocked ? '#' : answers[keyFor(cell.row, cell.col)] ?? '')
+} 
+
+const emptyPuzzle: PuzzleData = { id: '', title: '', category: 'standard', orderIndex: 0, dimensions: { rows: 1, cols: 1 }, clues: { across: [], down: [] }, grid: [[{ row: 0, col: 0, letter: '', isBlocked: true }]] } 
 const keyFor = (row: number, col: number) => `${row}:${col}`
-
+const allCells = (p: PuzzleData) => p.grid.flat().filter((cell) => !cell.isBlocked)
 export default function Page() {
   const supabase = useMemo(() => createClient(), [])
   const [user, setUser] = useState<User | null>(null)
@@ -19,8 +64,12 @@ export default function Page() {
   const [dark, setDark] = useState(true)
   const [view, setView] = useState<'home' | 'browse' | 'play'>('home')
   const [filter, setFilter] = useState<'all' | 'standard' | 'custom'>('all')
-  const [active, setActive] = useState<PuzzleData>(sampleStandard)
+  const [puzzles, setPuzzles] = useState<PuzzleData[]>([])
+  const [active, setActive] = useState<PuzzleData>(emptyPuzzle)
   const [answers, setAnswers] = useState<Record<string, string>>({})
+  const [puzzleLoading, setPuzzleLoading] = useState(true)
+  const lastKnownUpdatedAt = useRef<string | null>(null)
+  const saveTimer = useRef<number | null>(null)
   const [direction, setDirection] = useState<Direction>('across')
   const [cursor, setCursor] = useState({ row: 0, col: 0 })
   const [seconds, setSeconds] = useState(0)
@@ -40,6 +89,9 @@ export default function Page() {
         if (profile?.display_name) { setName(profile.display_name); setProfileReady(true) }
         const { data: progress } = await supabase.from('puzzle_progress').select('puzzle_id, completed').eq('user_id', data.user.id)
         setCompleted(progress?.filter((row) => row.completed).map((row) => row.puzzle_id) ?? [])
+        const { data: puzzleRows } = await supabase.from('puzzles').select('id,title,puzzle_type,order_index,width,height,grid,clues').order('order_index')
+        if (puzzleRows) setPuzzles((puzzleRows as PuzzleRow[]).map(mapPuzzle))
+        setPuzzleLoading(false)
       }
       setAuthChecked(true)
     })
@@ -56,9 +108,16 @@ export default function Page() {
   const isSolved = allCells(active).every((cell) => answers[keyFor(cell.row, cell.col)] === cell.letter)
   const time = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`
 
-  function openPuzzle(puzzle: PuzzleData) {
+  async function openPuzzle(puzzle: PuzzleData) {
     setActive(puzzle); setView('play'); setSeconds(0); setModal(false); setAnswers({});
-    const first = allCells(puzzle)[0]; setCursor({ row: first.row, col: first.col }); setDirection('across'); window.setTimeout(() => inputRef.current?.focus(), 100)
+    const first = allCells(puzzle)[0]
+    if (first) { setCursor({ row: first.row, col: first.col }); setDirection('across') }
+    if (user) {
+      const { data } = await supabase.from('puzzle_progress').select('cell_state,completed,solve_time_seconds,updated_at').eq('user_id', user.id).eq('puzzle_id', puzzle.id).maybeSingle()
+      if (data) { lastKnownUpdatedAt.current = data.updated_at; setAnswers(answersFromState(puzzle, data.cell_state ?? [])); setSeconds(data.solve_time_seconds ?? 0) }
+      else lastKnownUpdatedAt.current = null
+    }
+    window.setTimeout(() => inputRef.current?.focus(), 100)
   }
   function focusCell(row: number, col: number, toggle = false) {
     const cell = active.grid[row][col]; if (cell.isBlocked) return
@@ -83,11 +142,33 @@ export default function Page() {
   function checkWord() { const next = { ...answers }; wordCells.forEach((cell) => { const expected = active.grid[cell.row][cell.col].letter; if (next[keyFor(cell.row, cell.col)] && next[keyFor(cell.row, cell.col)] !== expected) next[keyFor(cell.row, cell.col)] = '' }); setAnswers(next) }
   function checkGrid() { const next = { ...answers }; allCells(active).forEach((cell) => { if (next[keyFor(cell.row, cell.col)] && next[keyFor(cell.row, cell.col)] !== cell.letter) next[keyFor(cell.row, cell.col)] = '' }); setAnswers(next) }
   function reset() { setAnswers({}); setSeconds(0); setModal(false) }
-  async function saveProgress(state: Record<string, string>, done: boolean) { if (!user) return; const cellState = active.grid.flat().map((cell) => state[keyFor(cell.row, cell.col)] ?? ''); await supabase.from('puzzle_progress').upsert({ user_id: user.id, puzzle_id: active.id, cell_state: cellState, completed: done, solve_time_seconds: done ? seconds : null, completed_at: done ? new Date().toISOString() : null, updated_at: new Date().toISOString() }) }
+  async function saveProgress(state: Record<string, string>, done: boolean) {
+    if (!user || !active.id) return
+    if (saveTimer.current) window.clearTimeout(saveTimer.current)
+    saveTimer.current = window.setTimeout(async () => {
+      const cellState = cellStateFor(active, state)
+      const now = new Date().toISOString()
+      let query = supabase.from('puzzle_progress').update({ cell_state: cellState, completed: done, solve_time_seconds: done ? seconds : null, completed_at: done ? now : null, updated_at: now }).eq('user_id', user.id).eq('puzzle_id', active.id)
+      if (lastKnownUpdatedAt.current) query = query.eq('updated_at', lastKnownUpdatedAt.current)
+      const { data, error } = await query.select('updated_at').maybeSingle()
+      if (error || !data) {
+        const { data: server } = await supabase.from('puzzle_progress').select('cell_state,updated_at').eq('user_id', user.id).eq('puzzle_id', active.id).maybeSingle()
+        if (server) { lastKnownUpdatedAt.current = server.updated_at; setAnswers(answersFromState(active, server.cell_state ?? [])) }
+        else {
+          const { data: inserted } = await supabase.from('puzzle_progress').upsert({ user_id: user.id, puzzle_id: active.id, cell_state: cellState, completed: done, solve_time_seconds: done ? seconds : null, completed_at: done ? now : null, updated_at: now }, { onConflict: 'user_id,puzzle_id' }).select('updated_at').single()
+          if (inserted) lastKnownUpdatedAt.current = inserted.updated_at
+        }
+      } else lastKnownUpdatedAt.current = data.updated_at
+    }, done ? 0 : 2500)
+  }
+  useEffect(() => () => { if (saveTimer.current) window.clearTimeout(saveTimer.current) }, [])
   async function saveProfile(value: string) { if (!user || !value.trim()) return; const { error } = await supabase.from('profiles').upsert({ id: user.id, display_name: value.trim() }); if (!error) { setName(value.trim()); setProfileReady(true) } }
 
+  if (!authChecked) return <LoadingScreen />
   if (!user) return <AuthScreen supabase={supabase} />
   if (!profileReady) return <ProfileScreen onSave={saveProfile} />
+  if (puzzleLoading) return <LoadingScreen />
+  if (!puzzles.length) return <main className="auth-shell"><div className="auth-card"><span className="brand-mark"><Grid2X2 size={19} /></span><h1 className="mt-5 text-2xl font-semibold">Your collection is getting ready</h1><p className="mt-3 text-sm text-muted-foreground">No puzzles have been added yet.</p></div></main>
   if (view === 'play') return <PlayScreen active={active} answers={answers} cursor={cursor} direction={direction} activeClue={activeClue} wordCells={wordCells} seconds={seconds} time={time} inputRef={inputRef} onKey={handleKey} onCell={focusCell} onDirection={setDirection} onClue={(clue: Clue) => { setCursor({ row: clue.row, col: clue.col }); setDirection(clue.direction); inputRef.current?.focus() }} onBack={() => setView('home')} onCheckWord={checkWord} onCheckGrid={checkGrid} onReset={reset} modal={modal} onCloseModal={() => setModal(false)} />
 
   return <main className="min-h-screen bg-background text-foreground"><header className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5 sm:px-8"><button className="flex items-center gap-3" onClick={() => setView('home')}><span className="brand-mark"><Grid2X2 size={19} /></span><span className="text-lg font-semibold">Across & Along</span></button><div className="flex items-center gap-2"><button className="icon-button" onClick={() => setDark(!dark)} aria-label="Toggle theme">{dark ? <Sun size={18} /> : <Moon size={18} />}</button><button className="avatar" onClick={() => supabase.auth.signOut()} aria-label="Sign out">{name.slice(0, 2).toUpperCase()}</button></div></header><section className="mx-auto max-w-6xl px-5 pb-16 sm:px-8"><div className="hero"><div><p className="eyebrow sage">Your private collection</p><h1 className="mt-3 max-w-xl text-4xl font-semibold tracking-tight sm:text-6xl">A little time together, one square at a time.</h1><p className="mt-5 max-w-lg leading-7 text-muted-foreground">A free, ad-free crossword collection made for family and friends.</p></div><div className="hero-note"><BookOpen size={18} /><p className="text-sm leading-5">On iPhone? Use Safari&apos;s Share menu to add this app to your Home Screen.</p></div></div><div className="mt-14 flex items-end justify-between"><div><p className="eyebrow">Continue</p><h2 className="mt-2 text-2xl font-semibold">Pick up where you left off</h2></div><button className="browse-link" onClick={() => setView('browse')}>Browse all <ChevronRight size={16} /></button></div><button className="continue-card mt-5 w-full text-left" onClick={() => openPuzzle(nextPuzzle)}><div><span className={`eyebrow ${nextPuzzle.category === 'custom' ? 'coral' : 'sage'}`}>{nextPuzzle.category === 'custom' ? 'Family custom' : 'Standard puzzle'}</span><h3 className="mt-3 text-2xl font-semibold">{nextPuzzle.title}</h3><p className="mt-2 text-sm text-muted-foreground">{nextPuzzle.clues.across[0].text}</p></div><span className="play-circle"><ChevronRight size={23} /></span></button><div className="section-heading mt-14"><div><p className="eyebrow">The collection</p><h2 className="mt-2 text-2xl font-semibold">All puzzles</h2></div><button className="browse-link" onClick={() => setView('browse')}>See collection <ChevronRight size={16} /></button></div><div className="puzzle-grid">{puzzles.slice(0, 3).map((puzzle) => <PuzzleCard key={puzzle.id} puzzle={puzzle} done={completed.includes(puzzle.id)} onOpen={openPuzzle} />)}</div></section></main>
