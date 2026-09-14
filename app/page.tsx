@@ -39,7 +39,9 @@ function mapPuzzle(row: PuzzleRow): PuzzleData | null {
   clues.down.forEach((clue, id) => { for (let rowIndex = clue.row; rowIndex < row.height && !grid[rowIndex][clue.col].isBlocked; rowIndex++) grid[rowIndex][clue.col].downClueId = id })
   grid.flat().forEach((cell) => { cell.clueNumber = numberByStart.get(`${cell.row}:${cell.col}`) })
   const puzzle: PuzzleData = { id: row.id, title: row.title, category: row.puzzle_type, orderIndex: row.order_index, dimensions: { rows: row.height, cols: row.width }, clues, grid }
-  return validatePuzzleData(puzzle).valid ? puzzle : null
+  const validation = validatePuzzleData(puzzle)
+  if (!validation.valid) { console.warn(`[crossword] Puzzle "${row.title}" (${row.id}) dropped — validation errors:`, validation.errors); return null }
+  return puzzle
 } 
 
 function answersFromState(puzzle: PuzzleData, cellState: string[]) {
@@ -78,6 +80,7 @@ export default function Page() {
   const [completed, setCompleted] = useState<string[]>([])
   const [modal, setModal] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const secondsRef = useRef(0)
 
   useEffect(() => { document.documentElement.classList.toggle('dark', dark) }, [dark])
   useEffect(() => {
@@ -100,7 +103,7 @@ export default function Page() {
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => { setUser(session?.user ?? null); if (!session) setProfileReady(false) })
     return () => { mounted = false; listener.subscription.unsubscribe() }
   }, [supabase])
-  useEffect(() => { if (view !== 'play' || modal) return; const timer = window.setInterval(() => setSeconds((s) => s + 1), 1000); return () => window.clearInterval(timer) }, [view, modal])
+  useEffect(() => { if (view !== 'play' || modal) return; const timer = window.setInterval(() => setSeconds((s) => { secondsRef.current = s + 1; return s + 1 }), 1000); return () => window.clearInterval(timer) }, [view, modal])
   useEffect(() => { if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => undefined) }, [])
 
   const filtered = puzzles.filter((p) => filter === 'all' || p.category === filter)
@@ -111,12 +114,12 @@ export default function Page() {
   const time = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`
 
   async function openPuzzle(puzzle: PuzzleData) {
-    setActive(puzzle); setView('play'); setSeconds(0); setModal(false); setAnswers({});
+    setActive(puzzle); setView('play'); setSeconds(0); secondsRef.current = 0; setModal(false); setAnswers({});
     const first = allCells(puzzle)[0]
     if (first) { setCursor({ row: first.row, col: first.col }); setDirection('across') }
     if (user) {
       const { data } = await supabase.from('puzzle_progress').select('cell_state,completed,solve_time_seconds,updated_at').eq('user_id', user.id).eq('puzzle_id', puzzle.id).maybeSingle()
-      if (data) { lastKnownUpdatedAt.current = data.updated_at; setAnswers(answersFromState(puzzle, data.cell_state ?? [])); setSeconds(data.solve_time_seconds ?? 0) }
+      if (data) { lastKnownUpdatedAt.current = data.updated_at; setAnswers(answersFromState(puzzle, data.cell_state ?? [])); setSeconds(data.solve_time_seconds ?? 0); secondsRef.current = data.solve_time_seconds ?? 0; }
       else lastKnownUpdatedAt.current = null
     }
     window.setTimeout(() => inputRef.current?.focus(), 100)
@@ -143,21 +146,21 @@ export default function Page() {
   function moveArrow(key: string) { const delta = key === 'ArrowLeft' ? [0, -1] : key === 'ArrowRight' ? [0, 1] : key === 'ArrowUp' ? [-1, 0] : [1, 0]; let r = cursor.row + delta[0], c = cursor.col + delta[1]; while (r >= 0 && c >= 0 && r < active.dimensions.rows && c < active.dimensions.cols && active.grid[r][c].isBlocked) { r += delta[0]; c += delta[1] } if (r >= 0 && c >= 0 && r < active.dimensions.rows && c < active.dimensions.cols) focusCell(r, c) }
   function checkWord() { const next = { ...answers }; wordCells.forEach((cell) => { const expected = active.grid[cell.row][cell.col].letter; if (next[keyFor(cell.row, cell.col)] && next[keyFor(cell.row, cell.col)] !== expected) next[keyFor(cell.row, cell.col)] = '' }); setAnswers(next); saveProgress(next, false) }
   function checkGrid() { const next = { ...answers }; allCells(active).forEach((cell) => { if (next[keyFor(cell.row, cell.col)] && next[keyFor(cell.row, cell.col)] !== cell.letter) next[keyFor(cell.row, cell.col)] = '' }); setAnswers(next); saveProgress(next, false) }
-  function reset() { const next = {}; setAnswers(next); setSeconds(0); setModal(false); saveProgress(next, false) }
+  function reset() { const next = {}; setAnswers(next); setSeconds(0); secondsRef.current = 0; setModal(false); saveProgress(next, false) }
   async function flushProgress() {
     const pending = pendingSave.current
     if (!user || !pending || pending.puzzleId !== active.id) return
     pendingSave.current = null
     const cellState = cellStateFor(active, pending.state)
     const now = new Date().toISOString()
-    let query = supabase.from('puzzle_progress').update({ cell_state: cellState, completed: pending.done, solve_time_seconds: pending.done ? seconds : null, completed_at: pending.done ? now : null, updated_at: now }).eq('user_id', user.id).eq('puzzle_id', active.id)
+    let query = supabase.from('puzzle_progress').update({ cell_state: cellState, completed: pending.done, solve_time_seconds: pending.done ? secondsRef.current : null, completed_at: pending.done ? now : null, updated_at: now }).eq('user_id', user.id).eq('puzzle_id', active.id)
     if (lastKnownUpdatedAt.current) query = query.eq('updated_at', lastKnownUpdatedAt.current)
     const { data, error } = await query.select('updated_at').maybeSingle()
     if (error) { pendingSave.current = pending; return }
     if (data) { lastKnownUpdatedAt.current = data.updated_at; return }
     const { data: server } = await supabase.from('puzzle_progress').select('cell_state,updated_at').eq('user_id', user.id).eq('puzzle_id', active.id).maybeSingle()
     if (server) { lastKnownUpdatedAt.current = server.updated_at; setAnswers(answersFromState(active, server.cell_state ?? [])); return }
-    const { data: inserted } = await supabase.from('puzzle_progress').insert({ user_id: user.id, puzzle_id: active.id, cell_state: cellState, completed: pending.done, solve_time_seconds: pending.done ? seconds : null, completed_at: pending.done ? now : null, updated_at: now }).select('updated_at').single()
+    const { data: inserted } = await supabase.from('puzzle_progress').insert({ user_id: user.id, puzzle_id: active.id, cell_state: cellState, completed: pending.done, solve_time_seconds: pending.done ? secondsRef.current : null, completed_at: pending.done ? now : null, updated_at: now }).select('updated_at').single()
     if (inserted) lastKnownUpdatedAt.current = inserted.updated_at
     else pendingSave.current = pending
   }
@@ -172,7 +175,8 @@ export default function Page() {
     window.addEventListener('online', flush)
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush() })
     return () => { window.removeEventListener('online', flush); if (saveTimer.current) window.clearTimeout(saveTimer.current); flush() }
-  }, [user, active.id, seconds])
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- seconds intentionally read via secondsRef to avoid re-running this effect every tick
+  }, [user, active.id])
   async function saveProfile(value: string) { if (!user || !value.trim()) return; const { error } = await supabase.from('profiles').upsert({ id: user.id, display_name: value.trim() }); if (!error) { setName(value.trim()); setProfileReady(true) } }
 
   if (!authChecked) return <LoadingScreen />
