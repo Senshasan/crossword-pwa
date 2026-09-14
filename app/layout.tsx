@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   applicationName: 'Across & Along',
   manifest: '/manifest.json',
   appleWebApp: { capable: true, title: 'Across & Along', statusBarStyle: 'black-translucent' },
-  icons: { icon: '/icon.svg', apple: '/icon.svg' },
+  icons: { icon: '/icon.svg', apple: '/apple-icon.png' },
 }
 
 export const viewport: Viewport = { colorScheme: 'light dark', themeColor: [{ media: '(prefers-color-scheme: light)', color: '#f7f7f4' }, { media: '(prefers-color-scheme: dark)', color: '#1d211f' }] }
