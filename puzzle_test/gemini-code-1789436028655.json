@@ -1,0 +1,44 @@
+{
+  "id": "test-puzzle-1",
+  "title": "The Basics",
+  "difficulty": "easy",
+  "dimensions": { "width": 5, "height": 5 },
+  "clues": [
+    {
+      "id": "1A",
+      "number": 1,
+      "direction": "across",
+      "clue": "A common daytime greeting",
+      "answer": "HELLO",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "3A",
+      "number": 3,
+      "direction": "across",
+      "clue": "Fruit that allegedly keeps the doctor away",
+      "answer": "APPLE",
+      "x": 0,
+      "y": 2
+    },
+    {
+      "id": "1D",
+      "number": 1,
+      "direction": "down",
+      "clue": "The organ that beats in your chest",
+      "answer": "HEART",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "2D",
+      "number": 2,
+      "direction": "down",
+      "clue": "Foreshadowing signs or signals",
+      "answer": "OMENS",
+      "x": 4,
+      "y": 0
+    }
+  ]
+}

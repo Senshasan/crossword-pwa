@@ -1,0 +1,44 @@
+{
+  "id": "test-puzzle-2",
+  "title": "Media & Minds",
+  "difficulty": "easy",
+  "dimensions": { "width": 5, "height": 5 },
+  "clues": [
+    {
+      "id": "1A",
+      "number": 1,
+      "direction": "across",
+      "clue": "Cardboard shipping containers",
+      "answer": "BOXES",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "3A",
+      "number": 3,
+      "direction": "across",
+      "clue": "Theatrical production with soaring vocals",
+      "answer": "OPERA",
+      "x": 0,
+      "y": 2
+    },
+    {
+      "id": "1D",
+      "number": 1,
+      "direction": "down",
+      "clue": "Personal websites or digital journals",
+      "answer": "BLOGS",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "2D",
+      "number": 2,
+      "direction": "down",
+      "clue": "Highly intelligent or clever",
+      "answer": "SMART",
+      "x": 4,
+      "y": 0
+    }
+  ]
+}

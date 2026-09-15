@@ -1,0 +1,62 @@
+{
+  "id": "test-puzzle-3",
+  "title": "Interlocking",
+  "difficulty": "medium",
+  "dimensions": { "width": 5, "height": 5 },
+  "clues": [
+    {
+      "id": "1A",
+      "number": 1,
+      "direction": "across",
+      "clue": "Sheet notation or an audio streaming category",
+      "answer": "MUSIC",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "2A",
+      "number": 2,
+      "direction": "across",
+      "clue": "Locomotive transport that runs on tracks",
+      "answer": "TRAIN",
+      "x": 0,
+      "y": 2
+    },
+    {
+      "id": "3A",
+      "number": 3,
+      "direction": "across",
+      "clue": "A joyful, elevated state of mind",
+      "answer": "HAPPY",
+      "x": 0,
+      "y": 4
+    },
+    {
+      "id": "1D",
+      "number": 1,
+      "direction": "down",
+      "clue": "A perfect pairing, or a small fire starter",
+      "answer": "MATCH",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "2D",
+      "number": 2,
+      "direction": "down",
+      "clue": "Postage requirement for a letter",
+      "answer": "STAMP",
+      "x": 2,
+      "y": 0
+    },
+    {
+      "id": "3D",
+      "number": 3,
+      "direction": "down",
+      "clue": "Sweet treats found at a movie theater",
+      "answer": "CANDY",
+      "x": 4,
+      "y": 0
+    }
+  ]
+}
