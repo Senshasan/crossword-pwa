@@ -234,3 +234,102 @@ export function validatePuzzleData(puzzle: PuzzleData): {
 
   return { valid: errors.length === 0, errors };
 }
+
+export type PuzzleRow = {
+  id: string;
+  title: string;
+  puzzle_type: "standard" | "custom";
+  order_index: number;
+  author_name?: string;
+  congrats_message?: string;
+  width: number;
+  height: number;
+  grid: string[];
+  clues: { across: Clue[]; down: Clue[] };
+};
+
+export function mapPuzzle(row: PuzzleRow): PuzzleData | null {
+  if (
+    !row.id ||
+    !row.title ||
+    !Number.isInteger(row.width) ||
+    !Number.isInteger(row.height) ||
+    row.width < 1 ||
+    row.height < 1 ||
+    row.width > 30 ||
+    row.height > 30 ||
+    !Array.isArray(row.grid) ||
+    row.grid.length !== row.width * row.height ||
+    !row.clues ||
+    !Array.isArray(row.clues.across) ||
+    !Array.isArray(row.clues.down)
+  )
+    return null;
+  const grid: CellData[][] = Array.from({ length: row.height }, (_, rowIndex) =>
+    Array.from({ length: row.width }, (_, colIndex) => {
+      const letter =
+        typeof row.grid[rowIndex * row.width + colIndex] === "string"
+          ? row.grid[rowIndex * row.width + colIndex].toUpperCase()
+          : "#";
+      return {
+        row: rowIndex,
+        col: colIndex,
+        letter,
+        isBlocked: letter === "#",
+      };
+    }),
+  );
+  const clues = {
+    across: row.clues.across.map((clue) => ({
+      ...clue,
+      direction: "across" as const,
+    })),
+    down: row.clues.down.map((clue) => ({
+      ...clue,
+      direction: "down" as const,
+    })),
+  };
+  const numberByStart = new Map<string, number>();
+  [...clues.across, ...clues.down].forEach((clue) =>
+    numberByStart.set(`${clue.row}:${clue.col}`, clue.number),
+  );
+  clues.across.forEach((clue, id) => {
+    for (
+      let col = clue.col;
+      col < row.width && !grid[clue.row][col].isBlocked;
+      col++
+    )
+      grid[clue.row][col].acrossClueId = id;
+  });
+  clues.down.forEach((clue, id) => {
+    for (
+      let rowIndex = clue.row;
+      rowIndex < row.height && !grid[rowIndex][clue.col].isBlocked;
+      rowIndex++
+    )
+      grid[rowIndex][clue.col].downClueId = id;
+  });
+  grid.flat().forEach((cell) => {
+    cell.clueNumber = numberByStart.get(`${cell.row}:${cell.col}`);
+  });
+  const puzzle: PuzzleData = {
+    id: row.id,
+    title: row.title,
+    category: row.puzzle_type,
+    orderIndex: row.order_index,
+    authorName: row.author_name,
+    congratsMessage: row.congrats_message,
+    dimensions: { rows: row.height, cols: row.width },
+    clues,
+    grid,
+  };
+  const validation = validatePuzzleData(puzzle);
+  if (!validation.valid) {
+    console.warn(
+      `[crossword] Puzzle "${row.title}" (${row.id}) dropped — validation errors:`,
+      validation.errors,
+    );
+    return null;
+  }
+  return puzzle;
+}

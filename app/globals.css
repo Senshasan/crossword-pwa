@@ -329,6 +329,16 @@ button {
   background: #e6eee8;
   color: #27372d;
 }
+.cell.wrong {
+  background: #dd8065;
+  color: #fff;
+  animation: shake 0.3s ease-in-out;
+}
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  75% { transform: translateX(3px); }
+}
 .grid-controls {
   display: flex;
   justify-content: space-between;
