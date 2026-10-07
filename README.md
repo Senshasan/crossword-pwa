@@ -1,33 +1,31 @@
-# crossword-pwa
+# Crossword PWA
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [v0](https://v0.app).
+A modern, responsive Progressive Web Application (PWA) tailored for solving, managing, and tracking custom crossword puzzles[cite: 1]. Built with performance, offline capability, and user experience in mind, this application delivers a native-like puzzle experience directly in the browser[cite: 1].
 
-## Built with v0
+## Key Features
 
-This repository is linked to a [v0](https://v0.app) project. You can continue developing by visiting the link below -- start new chats to make changes, and v0 will push commits directly to this repo. Every merge to `main` will automatically deploy.
+* **Interactive Puzzle Engine:** Features a dedicated `PlayScreen` and custom `PuzzleCard` components for a highly interactive and intuitive solving experience[cite: 1].
+* **User Authentication & Profiles:** Secure user onboarding and session management, featuring dedicated `AuthScreen` and `ProfileScreen` interfaces[cite: 1].
+* **Real-time Progress Tracking:** Automatically saves user progress mid-puzzle, ensuring solvers never lose their work[cite: 1].
+* **Installable PWA:** Fully configured with a Web App Manifest and Service Worker (`sw.js`), allowing users to install the app on their mobile or desktop home screens for seamless access[cite: 1].
+* **Polished UI/UX:** Utilizes reusable UI elements and dynamic loading screens to maintain a smooth, app-like feel during data fetching[cite: 1].
 
-[Continue working on v0 →](https://v0.app/chat/projects/prj_Cs8ciQtdZBSP8ymSk1bIBH4IR2Fv)
+## Technical Choices & Architecture
 
-## Getting Started
+This repository is structured around a modern React ecosystem, chosen specifically for developer velocity, type safety, and scalable state management[cite: 1].
 
-First, run the development server:
+* **Framework (Next.js App Router):** The project utilizes the Next.js `app/` directory (`layout.tsx`, `page.tsx`)[cite: 1]. This architecture was chosen to leverage React Server Components and optimized routing, providing faster initial page loads and better SEO for the web app[cite: 1].
+* **Backend & Infrastructure (Supabase):** The application integrates Supabase for its PostgreSQL database and authentication infrastructure[cite: 1]. This ensures a reliable, version-controlled database schema across all environments.
+* **Security & Session Management:** The `lib/supabase/` directory isolates client, server, and proxy configurations to securely manage sessions and database interactions across different rendering contexts[cite: 1]. 
+* **Custom React Hooks:** Business logic is decoupled from the UI using custom hooks (`useAuth.ts`, `usePuzzles.ts`, `usePuzzleProgress.ts`)[cite: 1]. This separation of concerns ensures that the visual components remain clean and focused solely on rendering, while complex data fetching and state mutations happen behind the scenes[cite: 1].
+* **Deployment (Vercel):** The application is deployed and hosted on Vercel, providing a highly available, edge-optimized environment suited for modern web applications.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-```
+## Project Structure
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-## Learn More
-
-To learn more, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-- [v0 Documentation](https://v0.app/docs) - learn about v0 and how to use it.
+* `/app`: Next.js App Router pages and global layouts (e.g., `globals.css`, `layout.tsx`)[cite: 1].
+* `/components`: Core application interfaces like `PlayScreen.tsx`, `ProfileScreen.tsx`, and `AuthScreen.tsx`[cite: 1].
+* `/components/ui`: Reusable, atomic design components (e.g., `button.tsx`)[cite: 1].
+* `/hooks`: Custom state management and data fetching hooks (`useAuth`, `usePuzzles`, `usePuzzleProgress`)[cite: 1].
+* `/lib`: Core utilities and the crosswords engine logic, heavily featuring the Supabase client and server setup[cite: 1].
+* `/public`: Static assets, including PWA icons, placeholders, the Web App Manifest, and the Service Worker (`sw.js`)[cite: 1].
+* `/supabase/migrations`: Version-controlled SQL schema definitions[cite: 1].
