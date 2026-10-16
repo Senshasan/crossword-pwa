@@ -1,6 +1,6 @@
 # Across & Along — Project Status
 
-Last updated: 2026-10-17 (after Round 5 Phase A, German UI). The latest commit at the time of writing is `566f4ab`.
+Last updated: 2026-10-17 (after Round 5 Phase B, difficulty). The latest commit at the time of writing is `e105914`.
 
 Read this first in a new session. `CLAUDE.md` in the repo root holds the standing architecture notes and rules. This file records **what has been done, what state things are in, and what is still open**. Treat the code as the source of truth if the two disagree.
 
@@ -26,7 +26,8 @@ A private, ad-free crossword PWA made as a birthday gift for a friend, played by
 | Leaderboard migration replay (`DROP FUNCTION` before recreate) | **Fixed** by the user in the migration file |
 | UI and design overhaul | **Done and committed** (`406d0f7`, `c59f4c5`) |
 | Round 5 plan (`docs/implementation-plan-round_2.md`), Phase A: German UI | **Done** (2026-10-17, not yet committed), all strings in `lib/strings.ts` |
-| Round 5 Phases B–E (difficulty, generator, clues, custom) | **Not started** |
+| Round 5 Phase B: difficulty | **Done** (2026-10-17, not yet committed). Migration `20261017000000_add_difficulty.sql` must be applied **before** deploying |
+| Round 5 Phases C–E (generator, clues, custom) | **Not started** |
 | Phone verification of all of the above | **Pending** (see §6) |
 | Real puzzle content | **Not started.** This is the main remaining task |
 
@@ -80,7 +81,7 @@ A private, ad-free crossword PWA made as a birthday gift for a friend, played by
   - The `keep_first_clear` trigger makes a first solve permanent: once `completed` is true, it can't be set back, and `completed_at` / `solve_time_seconds` can't change.
   - It deliberately leaves `updated_at` alone, because the client uses `updated_at` to detect conflicting saves from two devices.
   - Never add a trigger that sets `updated_at` automatically.
-- **Migrations are applied by hand** in the Supabase dashboard. Only ever *add* migration files, and never run or edit one that has been applied. The live database has all four migrations in `supabase/migrations/` applied.
+- **Migrations are applied by hand** in the Supabase dashboard. Only ever *add* migration files, and never run or edit one that has been applied. The live database has the first four migrations in `supabase/migrations/` applied; `20261017000000_add_difficulty.sql` (Phase B) is new and must be applied before deploying.
 - **Puzzle rows that fail validation are silently left out of the app** (`mapPuzzle` → `validatePuzzleData` in `lib/crossword.ts`, which only logs a `console.warn`). Check them before inserting:
   ```
   node scripts/validate-puzzles.mjs <file.json>
@@ -126,6 +127,7 @@ Headless Chrome has a minimum window width of about 500 px. For a true 390 px ph
 **Do first:** delete the installed app and add it to the Home Screen again (and, if needed, clear the site's data in Safari). Older installs may still hold the pre-Round-3 service worker, and iOS caches icons.
 
 - [ ] **German UI (Phase A):** every screen is in German. Typing ä/ö/ü/ß on the iPhone keyboard (long-press on a, o, u or s) shows the "Umlaute: AE, OE, UE · ß: SS" toast and enters no letter. iOS may deliver long-press letters as composed input, which `handleKey` skips, so check this one specifically.
+- [ ] **Difficulty (Phase B):** cards, the Continue card and the play header show a Leicht/Mittel/Schwer tag; the Browse filters (type × difficulty × "Nur ungelöste") combine.
 - [ ] **Updates:** a new deploy shows the "Neue Version verfügbar" bar, and **Neu laden** applies it.
 - [ ] **Layout:** the header clears the status bar on Home and inside a puzzle.
 - [ ] **Browse:** every puzzle is listed.

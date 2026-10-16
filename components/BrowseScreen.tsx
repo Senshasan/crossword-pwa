@@ -1,15 +1,20 @@
 import { useState } from "react";
-import { ChevronLeft } from "lucide-react";
-import { type PuzzleData } from "@/lib/crossword";
+import { Check, ChevronLeft } from "lucide-react";
+import { DIFFICULTIES, type Difficulty, type PuzzleData } from "@/lib/crossword";
 import { PuzzleCard } from "@/components/PuzzleCard";
 import { de } from "@/lib/strings";
 
 const t = de.browse;
 
-const FILTERS = [
+const CATEGORY_FILTERS = [
   { key: "all", label: t.all },
   { key: "standard", label: de.puzzle.standard },
   { key: "custom", label: de.puzzle.family },
+] as const;
+
+const DIFFICULTY_FILTERS = [
+  { key: "all", label: t.all },
+  ...DIFFICULTIES.map((key) => ({ key, label: de.puzzle.difficulty[key] })),
 ] as const;
 
 export function BrowseScreen({
@@ -23,8 +28,17 @@ export function BrowseScreen({
   onOpen: (puzzle: PuzzleData) => void;
   onHome: () => void;
 }) {
-  const [filter, setFilter] = useState<"all" | "standard" | "custom">("all");
-  const filtered = puzzles.filter((p) => filter === "all" || p.category === filter);
+  const [category, setCategory] = useState<"all" | "standard" | "custom">("all");
+  const [difficulty, setDifficulty] = useState<"all" | Difficulty>("all");
+  const [unsolvedOnly, setUnsolvedOnly] = useState(false);
+  // The filters combine: a puzzle must pass all three.
+  const filtered = puzzles.filter(
+    (p) =>
+      (category === "all" || p.category === category) &&
+      (difficulty === "all" || p.difficulty === difficulty) &&
+      (!unsolvedOnly || !completed.includes(p.id)),
+  );
+  const filtering = category !== "all" || difficulty !== "all" || unsolvedOnly;
   const solvedCount = puzzles.filter((p) => completed.includes(p.id)).length;
 
   return (
@@ -39,12 +53,31 @@ export function BrowseScreen({
         </p>
       </div>
 
-      <div className="tabs mb-6" role="group" aria-label={t.filterLabel}>
-        {FILTERS.map(({ key, label }) => (
-          <button key={key} aria-pressed={filter === key} onClick={() => setFilter(key)}>
-            {label}
+      <div className="mb-6 flex flex-col gap-3">
+        <div className="tabs" role="group" aria-label={t.categoryFilterLabel}>
+          {CATEGORY_FILTERS.map(({ key, label }) => (
+            <button key={key} aria-pressed={category === key} onClick={() => setCategory(key)}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="tabs" role="group" aria-label={t.difficultyFilterLabel}>
+            {DIFFICULTY_FILTERS.map(({ key, label }) => (
+              <button key={key} aria-pressed={difficulty === key} onClick={() => setDifficulty(key)}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <button
+            className="filter-toggle"
+            aria-pressed={unsolvedOnly}
+            onClick={() => setUnsolvedOnly((on) => !on)}
+          >
+            {unsolvedOnly && <Check size={15} strokeWidth={2.5} />}
+            {t.unsolvedOnly}
           </button>
-        ))}
+        </div>
       </div>
 
       {filtered.length ? (
@@ -59,7 +92,7 @@ export function BrowseScreen({
           ))}
         </div>
       ) : (
-        <p className="py-10 text-center text-muted-foreground">{t.empty}</p>
+        <p className="py-10 text-center text-muted-foreground">{filtering ? t.noMatch : t.empty}</p>
       )}
     </section>
   );

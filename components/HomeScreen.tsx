@@ -1,7 +1,7 @@
 import { ArrowRight, ChevronRight, Share } from "lucide-react";
 import { type PuzzleData } from "@/lib/crossword";
 import { PuzzleCard } from "@/components/PuzzleCard";
-import { CategoryTag, PuzzleThumb } from "@/components/PuzzleBits";
+import { CategoryTag, DifficultyTag, PuzzleThumb } from "@/components/PuzzleBits";
 import { de } from "@/lib/strings";
 
 const t = de.home;
@@ -53,6 +53,7 @@ export function HomeScreen({
           <h3>{nextPuzzle.title}</h3>
           <div className="meta mt-1.5">
             <CategoryTag puzzle={nextPuzzle} />
+            <DifficultyTag puzzle={nextPuzzle} />
           </div>
           {teaser && !allSolved && (
             <p className="teaser mt-2 truncate">

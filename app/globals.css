@@ -346,6 +346,29 @@
 .tag.family::before {
   background: var(--family);
 }
+/* Difficulty: neutral ink, rising bars instead of the dot. */
+.tag.difficulty {
+  color: var(--muted-foreground);
+}
+.tag.difficulty::before {
+  display: none;
+}
+.tag.difficulty .bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+}
+.tag.difficulty .bars span {
+  width: 3px;
+  border-radius: 1px;
+  background: var(--border);
+}
+.tag.difficulty .bars span:nth-child(1) { height: 5px; }
+.tag.difficulty .bars span:nth-child(2) { height: 8px; }
+.tag.difficulty .bars span:nth-child(3) { height: 11px; }
+.tag.difficulty .bars span.on {
+  background: currentColor;
+}
 .meta {
   display: flex;
   flex-wrap: wrap;
@@ -581,6 +604,26 @@
   background: var(--card);
   color: var(--foreground);
   box-shadow: 0 1px 2px #1f232014, 0 2px 8px #1f23200f;
+}
+/* "Nur ungelöste": an on/off chip next to the difficulty tabs. */
+.filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 46px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.filter-toggle[aria-pressed="true"] {
+  border-color: transparent;
+  background: var(--brand-tint);
+  color: var(--brand-ink);
 }
 
 /* ---------- Play ------------------------------------------------------------ */

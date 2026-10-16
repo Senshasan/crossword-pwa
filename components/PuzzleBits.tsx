@@ -1,4 +1,4 @@
-import { type PuzzleData } from "@/lib/crossword";
+import { DIFFICULTIES, type PuzzleData } from "@/lib/crossword";
 import { de } from "@/lib/strings";
 
 // The puzzle's real block pattern with no letters, so a preview never gives answers away.
@@ -23,4 +23,19 @@ export function categoryLabel(puzzle: PuzzleData) {
 
 export function CategoryTag({ puzzle }: { puzzle: PuzzleData }) {
   return <span className={`tag ${puzzle.category === "custom" ? "family" : ""}`}>{categoryLabel(puzzle)}</span>;
+}
+
+// Same look as CategoryTag, with one to three bars in place of the dot.
+export function DifficultyTag({ puzzle }: { puzzle: PuzzleData }) {
+  const level = DIFFICULTIES.indexOf(puzzle.difficulty) + 1;
+  return (
+    <span className="tag difficulty">
+      <span className="bars" aria-hidden="true">
+        {[1, 2, 3].map((n) => (
+          <span key={n} className={n <= level ? "on" : undefined} />
+        ))}
+      </span>
+      {de.puzzle.difficulty[puzzle.difficulty]}
+    </span>
+  );
 }

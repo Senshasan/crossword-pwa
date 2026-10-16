@@ -5,9 +5,11 @@
 //   node scripts/validate-puzzles.mjs <file.json>
 //
 // <file.json> is an array of `puzzles` rows (a single row object also works), each with
-// id, title, puzzle_type, width, height, grid, clues — the same shape as the table:
+// id, title, puzzle_type, difficulty, width, height, grid, clues — the same shape as the table:
+//   difficulty: "easy" | "medium" | "hard" (if left out, the DB default "easy" applies)
 //   grid:  flat array of width*height single letters, "#" for a blocked cell
 //   clues: { "across": [{ number, text, answer, row, col }], "down": [...] }
+// Grid letters and answers must be A–Z only: write Ä/Ö/Ü/ß as AE/OE/UE/SS.
 // One way to get such a file from existing rows: run
 //   select json_agg(p) from puzzles p;
 // in the Supabase SQL editor and save the result.
@@ -15,7 +17,7 @@
 // No network, no secrets. Needs Node 22.18+ (imports the .ts file directly); Node may
 // print a harmless MODULE_TYPELESS_PACKAGE_JSON warning. Exits 1 if any puzzle fails.
 import { readFileSync } from "node:fs";
-import { mapPuzzle } from "../lib/crossword.ts";
+import { DIFFICULTIES, mapPuzzle } from "../lib/crossword.ts";
 
 const file = process.argv[2];
 if (!file) {
@@ -41,6 +43,8 @@ function shapeErrors(row) {
   if (!row.title) errors.push("missing title");
   if (!["standard", "custom"].includes(row.puzzle_type))
     errors.push(`puzzle_type must be "standard" or "custom" (got ${JSON.stringify(row.puzzle_type)})`);
+  if (row.difficulty !== undefined && !DIFFICULTIES.includes(row.difficulty))
+    errors.push(`difficulty must be one of ${DIFFICULTIES.join(", ")} (got ${JSON.stringify(row.difficulty)})`);
   for (const key of ["width", "height"]) {
     const v = row[key];
     if (!Number.isInteger(v) || v < 1 || v > 30) errors.push(`${key} must be an integer from 1 to 30 (got ${JSON.stringify(v)})`);
@@ -50,6 +54,23 @@ function shapeErrors(row) {
     errors.push(`grid has ${row.grid.length} cells, expected width*height = ${row.width * row.height}`);
   if (!row.clues || !Array.isArray(row.clues.across) || !Array.isArray(row.clues.down))
     errors.push('clues must be { "across": [...], "down": [...] }');
+  return errors.concat(letterErrors(row));
+}
+
+// Ä/Ö/Ü/ß (or any other non-A–Z letter) can't be typed into the grid, so they must never get in.
+function letterErrors(row) {
+  const errors = [];
+  if (Array.isArray(row.grid))
+    row.grid.forEach((cell, i) => {
+      if (cell !== "#" && !(typeof cell === "string" && /^[A-Za-z]$/.test(cell))) {
+        const where = Number.isInteger(row.width) && row.width > 0 ? ` (row ${Math.floor(i / row.width)}, col ${i % row.width})` : "";
+        errors.push(`grid cell ${i}${where} is ${JSON.stringify(cell)}; only A–Z or "#" allowed`);
+      }
+    });
+  for (const dir of ["across", "down"])
+    for (const clue of row.clues?.[dir] ?? [])
+      if (typeof clue?.answer !== "string" || !/^[A-Za-z]+$/.test(clue.answer))
+        errors.push(`${clue?.number ?? "?"} ${dir}: answer ${JSON.stringify(clue?.answer)} must be A–Z only (Ä→AE, Ö→OE, Ü→UE, ß→SS)`);
   return errors;
 }
 
@@ -80,6 +101,7 @@ for (const [i, row] of rows.entries()) {
     for (const e of errors) console.log(`        - ${e}`);
   } else {
     console.log(`PASS  ${label}`);
+    if (row.difficulty === undefined) console.log('        note: no difficulty given; the database will use "easy"');
   }
 }
 

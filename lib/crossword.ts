@@ -1,5 +1,8 @@
 export type Direction = "across" | "down";
 
+export const DIFFICULTIES = ["easy", "medium", "hard"] as const;
+export type Difficulty = (typeof DIFFICULTIES)[number];
+
 export interface Clue {
   number: number;
   direction: Direction;
@@ -23,6 +26,7 @@ export interface PuzzleData {
   id: string;
   title: string;
   category: "standard" | "custom";
+  difficulty: Difficulty;
   orderIndex: number;
   authorName?: string;
   congratsMessage?: string;
@@ -239,6 +243,8 @@ export type PuzzleRow = {
   id: string;
   title: string;
   puzzle_type: "standard" | "custom";
+  // Optional here so a row from before the difficulty migration still maps (as "easy").
+  difficulty?: Difficulty;
   order_index: number;
   author_name?: string;
   congrats_message?: string;
@@ -312,10 +318,17 @@ export function mapPuzzle(row: PuzzleRow): PuzzleData | null {
   grid.flat().forEach((cell) => {
     cell.clueNumber = numberByStart.get(`${cell.row}:${cell.col}`);
   });
+  let difficulty: Difficulty = "easy";
+  if (DIFFICULTIES.includes(row.difficulty as Difficulty)) difficulty = row.difficulty as Difficulty;
+  else
+    console.warn(
+      `[crossword] Puzzle "${row.title}" (${row.id}) has no valid difficulty (got ${JSON.stringify(row.difficulty)}); using "easy".`,
+    );
   const puzzle: PuzzleData = {
     id: row.id,
     title: row.title,
     category: row.puzzle_type,
+    difficulty,
     orderIndex: row.order_index,
     authorName: row.author_name,
     congratsMessage: row.congrats_message,

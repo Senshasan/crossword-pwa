@@ -32,6 +32,7 @@ const emptyPuzzle: PuzzleData = {
   id: "",
   title: "",
   category: "standard",
+  difficulty: "easy",
   orderIndex: 0,
   dimensions: { rows: 1, cols: 1 },
   clues: { across: [], down: [] },

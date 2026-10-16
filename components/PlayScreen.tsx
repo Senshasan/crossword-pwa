@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, Clock3, RotateCcw, X } from "lucide-react";
 import { type Clue, type PuzzleData } from "@/lib/crossword";
-import { CategoryTag } from "@/components/PuzzleBits";
+import { CategoryTag, DifficultyTag } from "@/components/PuzzleBits";
 import { de } from "@/lib/strings";
 
 const t = de.play;
@@ -104,6 +104,7 @@ export function PlayScreen({
             <h1>{active.title}</h1>
             <div className="meta mt-2">
               <CategoryTag puzzle={active} />
+              <DifficultyTag puzzle={active} />
               <span>
                 {active.dimensions.cols}×{active.dimensions.rows}
               </span>

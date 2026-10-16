@@ -34,7 +34,7 @@ export function usePuzzles(supabase: ReturnType<typeof createClient>, userId: st
         supabase.from("puzzle_progress").select("puzzle_id, completed").eq("user_id", userId),
         supabase
           .from("puzzles")
-          .select("id,title,puzzle_type,order_index,width,height,grid,clues,author_name,congrats_message")
+          .select("id,title,puzzle_type,difficulty,order_index,width,height,grid,clues,author_name,congrats_message")
           .order("order_index"),
       ]);
 
