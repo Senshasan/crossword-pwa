@@ -20,6 +20,7 @@ import { usePuzzles } from "@/hooks/usePuzzles";
 import { usePuzzleProgress } from "@/hooks/usePuzzleProgress";
 import { useServiceWorker } from "@/hooks/useServiceWorker";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { useLeaderboard } from "@/hooks/useLeaderboard";
 
 import { AuthScreen } from "@/components/AuthScreen";
 import { ProfileScreen } from "@/components/ProfileScreen";
@@ -28,6 +29,7 @@ import { PuzzleCard } from "@/components/PuzzleCard";
 import { PlayScreen } from "@/components/PlayScreen";
 import { UpdateBanner } from "@/components/UpdateBanner";
 import { PullIndicator } from "@/components/PullIndicator";
+import { LeaderboardPodium } from "@/components/LeaderboardPodium";
 
 const keyFor = (row: number, col: number) => `${row}:${col}`;
 const allCells = (p: PuzzleData) =>
@@ -62,8 +64,12 @@ export default function Page() {
   const [toastMsg, setToastMsg] = useState("");
   const [isStandalone, setIsStandalone] = useState(true); // true by default: no flash of the hint
   
-  const [leaderboard, setLeaderboard] = useState<{display_name: string, completed_count: number}[]>([]);
-  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const {
+    rows: leaderboardRows,
+    loading: leaderboardLoading,
+    error: leaderboardError,
+    load: loadLeaderboard,
+  } = useLeaderboard(supabase);
 
   // Pull-to-refresh (and the menu's Refresh): new puzzles and a new app version, together.
   // Home and Browse only; in Play a downward drag belongs to the grid.
@@ -102,15 +108,10 @@ export default function Page() {
     );
   }, []);
 
+  // Fetched only when the menu opens, never on mount.
   useEffect(() => {
-    if (menuOpen) {
-      setLeaderboardLoading(true);
-      supabase.rpc('get_leaderboard', { limit_count: 3 }).then(({ data }) => {
-        if (data) setLeaderboard(data);
-        setLeaderboardLoading(false);
-      });
-    }
-  }, [menuOpen, supabase]);
+    if (menuOpen) void loadLeaderboard();
+  }, [menuOpen, loadLeaderboard]);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
@@ -541,35 +542,11 @@ export default function Page() {
               <div className="account-menu">
                 <div className="px-2 pt-1 pb-2 border-b border-border">
                   <p className="font-semibold">{name}</p>
-                  <p className="text-sm text-muted-foreground">{user?.email}</p>
+                  <p className="text-sm text-muted-foreground truncate">{user?.email}</p>
                 </div>
                 
-                <div className="px-2 py-2">
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Leaderboard</p>
-                  {leaderboardLoading ? (
-                    <div className="flex justify-center p-2"><Loader2 className="animate-spin text-muted-foreground" size={16} /></div>
-                  ) : (
-                    <div className="podium-layout">
-                      {leaderboard[1] && (
-                        <div className="podium-place place-2">
-                          <div className="podium-avatar bg-slate-300 text-slate-800">{leaderboard[1].display_name.slice(0, 2).toUpperCase()}</div>
-                          <span className="text-xs font-semibold">{leaderboard[1].completed_count}</span>
-                        </div>
-                      )}
-                      {leaderboard[0] && (
-                        <div className="podium-place place-1">
-                          <div className="podium-avatar bg-yellow-400 text-yellow-900">{leaderboard[0].display_name.slice(0, 2).toUpperCase()}</div>
-                          <span className="text-xs font-bold">{leaderboard[0].completed_count}</span>
-                        </div>
-                      )}
-                      {leaderboard[2] && (
-                        <div className="podium-place place-3">
-                          <div className="podium-avatar bg-orange-300 text-orange-900">{leaderboard[2].display_name.slice(0, 2).toUpperCase()}</div>
-                          <span className="text-xs font-semibold">{leaderboard[2].completed_count}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                <div className="py-3 border-b border-border">
+                  <LeaderboardPodium rows={leaderboardRows} loading={leaderboardLoading} error={leaderboardError} />
                 </div>
 
                 <button

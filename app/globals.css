@@ -474,7 +474,9 @@ button {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  width: 240px;
+  /* 290 = podium's 3×80px columns + 2×8px gaps + padding + border. */
+  width: 290px;
+  max-width: calc(100vw - 2rem);
   padding: 16px;
   background: var(--card);
   border: 1px solid var(--border);
