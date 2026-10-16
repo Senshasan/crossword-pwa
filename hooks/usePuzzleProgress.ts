@@ -29,7 +29,8 @@ export function usePuzzleProgress(
   active: PuzzleData,
   view: "home" | "browse" | "play",
   modal: boolean,
-  isCompleted: boolean
+  // True for a finished puzzle: the timer stops and the recorded solve time stands.
+  frozen: boolean
 ) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [seconds, setSeconds] = useState(0);
@@ -44,7 +45,7 @@ export function usePuzzleProgress(
   const secondsRef = useRef(0);
 
   useEffect(() => {
-    if (view !== "play" || modal || isCompleted) return;
+    if (view !== "play" || modal || frozen) return;
     const timer = window.setInterval(() => {
       setSeconds((s) => {
         secondsRef.current = s + 1;
@@ -52,7 +53,7 @@ export function usePuzzleProgress(
       });
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [view, modal, isCompleted]);
+  }, [view, modal, frozen]);
 
   async function flushProgress() {
     const pending = pendingSave.current;
@@ -157,7 +158,9 @@ export function usePuzzleProgress(
     };
   }, [user, active.id]);
 
-  async function loadPuzzleProgress(puzzle: PuzzleData) {
+  // Resolves to whether the server says this puzzle is completed, so the caller can
+  // freeze the timer even if it was finished on another device since the list loaded.
+  async function loadPuzzleProgress(puzzle: PuzzleData): Promise<boolean> {
     setAnswers({});
     setSeconds(0);
     secondsRef.current = 0;
@@ -176,15 +179,20 @@ export function usePuzzleProgress(
         setAnswers(answersFromState(puzzle, data.cell_state ?? []));
         setSeconds(data.solve_time_seconds ?? 0);
         secondsRef.current = data.solve_time_seconds ?? 0;
+        return data.completed === true;
       }
     }
+    return false;
   }
 
   function resetProgress() {
     setAnswers({});
-    setSeconds(0);
-    secondsRef.current = 0;
-    saveProgress({}, false);
+    // A finished puzzle keeps its completion and its recorded time.
+    if (!frozen) {
+      setSeconds(0);
+      secondsRef.current = 0;
+    }
+    saveProgress({}, frozen);
   }
 
   return {

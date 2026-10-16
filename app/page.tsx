@@ -69,6 +69,7 @@ export default function Page() {
 
   const inputRef = useRef<HTMLInputElement>(null);
   const checkTimerRef = useRef<number | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
 
   const {
     answers,
@@ -79,6 +80,11 @@ export default function Page() {
     loadPuzzleProgress,
     resetProgress,
   } = usePuzzleProgress(supabase, user, active, view, modal, completed.includes(active.id));
+  // Saves on a finished puzzle must keep completed=true; the client never un-completes.
+  const isDone = completed.includes(active.id);
+  // Latest answers for the delayed check-clear, which runs after this render's closure is stale.
+  const answersRef = useRef(answers);
+  answersRef.current = answers;
 
   useEffect(() => {
     setIsStandalone(
@@ -121,8 +127,10 @@ export default function Page() {
   }, [menuOpen]);
 
   useEffect(() => {
+    // Puzzle change or unmount: drop any pending check-clear so it can't hit the wrong grid.
     return () => {
       if (checkTimerRef.current) clearTimeout(checkTimerRef.current);
+      checkTimerRef.current = null;
     };
   }, [active.id]);
 
@@ -173,6 +181,7 @@ export default function Page() {
   async function openPuzzle(puzzle: PuzzleData) {
     if (!puzzle.id) return;
     if (checkTimerRef.current) clearTimeout(checkTimerRef.current);
+    checkTimerRef.current = null;
     setActive(puzzle);
     setView("play");
     setModal(false);
@@ -184,7 +193,9 @@ export default function Page() {
       setDirection("across");
     }
     
-    await loadPuzzleProgress(puzzle);
+    const done = await loadPuzzleProgress(puzzle);
+    // Finished elsewhere since the list loaded: record it so the timer stays frozen.
+    if (done) setCompleted((items) => (items.includes(puzzle.id) ? items : [...items, puzzle.id]));
     window.setTimeout(() => inputRef.current?.focus(), 100);
   }
 
@@ -208,37 +219,45 @@ export default function Page() {
     inputRef.current?.focus();
   }
 
+  // Typing during a check's red flash cancels the pending clear: the user is already fixing it.
+  function cancelPendingCheck() {
+    if (!checkTimerRef.current) return;
+    clearTimeout(checkTimerRef.current);
+    checkTimerRef.current = null;
+    setWrongCells(new Set());
+  }
+
   function setLetter(letter: string) {
     const cell = active.grid[cursor.row][cursor.col];
     if (!cell || cell.isBlocked) return;
-    const next = {
-      ...answers,
-      [keyFor(cursor.row, cursor.col)]: letter.toUpperCase(),
-    };
+    cancelPendingCheck();
+    const currentKey = keyFor(cursor.row, cursor.col);
+    const wasFilled = !!answers[currentKey];
+    const next = { ...answers, [currentKey]: letter.toUpperCase() };
     setAnswers(next);
-    
+
     setWrongCells((prev) => {
-      if (!prev.has(keyFor(cursor.row, cursor.col))) return prev;
+      if (!prev.has(currentKey)) return prev;
       const newSet = new Set(prev);
-      newSet.delete(keyFor(cursor.row, cursor.col));
+      newSet.delete(currentKey);
       return newSet;
     });
 
+    // Fresh letter: jump to the next empty cell later in the word. Overwriting a letter,
+    // or no empty cell ahead: step one cell. At the end of the word, stay put.
+    const index = wordCells.findIndex((c) => c.row === cursor.row && c.col === cursor.col);
+    const ahead = wordCells.slice(index + 1);
     const nextCell =
-      wordCells[
-        wordCells.findIndex(
-          (c) => c.row === cursor.row && c.col === cursor.col,
-        ) + 1
-      ];
+      (!wasFilled && ahead.find((c) => !next[keyFor(c.row, c.col)])) || ahead[0];
     if (nextCell) setCursor({ row: nextCell.row, col: nextCell.col });
-    
+
     if (
       allCells(active).every((c) => next[keyFor(c.row, c.col)] === c.letter)
     ) {
       setCompleted((items) => [...new Set([...items, active.id])]);
       setModal(true);
       saveProgress(next, true);
-    } else saveProgress(next, false);
+    } else saveProgress(next, isDone);
   }
 
   function handleKey(event: React.KeyboardEvent<HTMLInputElement>) {
@@ -250,6 +269,7 @@ export default function Page() {
     }
     if (event.key === "Backspace") {
       event.preventDefault();
+      cancelPendingCheck();
       const current = keyFor(cursor.row, cursor.col);
       if (answers[current]) {
         setAnswers({ ...answers, [current]: "" });
@@ -305,87 +325,48 @@ export default function Page() {
 
   function showToast(msg: string) {
     setToastMsg(msg);
-    setTimeout(() => setToastMsg(""), 2500);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = window.setTimeout(() => setToastMsg(""), 2500);
+  }
+
+  // Wrong letters flash red with the letter still visible, then clear after 800ms.
+  function checkCells(cells: { row: number; col: number }[], scope: "Word" | "Grid") {
+    cancelPendingCheck();
+    const filled = cells.filter((c) => answers[keyFor(c.row, c.col)]);
+    const wrongs = new Set(
+      filled
+        .filter((c) => answers[keyFor(c.row, c.col)] !== active.grid[c.row][c.col].letter)
+        .map((c) => keyFor(c.row, c.col)),
+    );
+
+    if (wrongs.size === 0) {
+      if (!filled.length) showToast("Nothing to check yet.");
+      else if (filled.length === cells.length) showToast(`${scope} is correct!`);
+      else showToast("No mistakes so far.");
+      return;
+    }
+
+    setWrongCells(wrongs);
+    showToast(wrongs.size === 1 ? "1 letter isn't right." : `${wrongs.size} letters aren't right.`);
+    const done = isDone;
+    checkTimerRef.current = window.setTimeout(() => {
+      checkTimerRef.current = null;
+      const cleared = { ...answersRef.current };
+      wrongs.forEach((k) => {
+        cleared[k] = "";
+      });
+      setAnswers(cleared);
+      setWrongCells(new Set());
+      saveProgress(cleared, done);
+    }, 800);
   }
 
   function checkWord() {
-    const next = { ...answers };
-    const wrongs = new Set<string>();
-    let allCorrect = true;
-    let checkedCount = 0;
-
-    wordCells.forEach((cell) => {
-      const key = keyFor(cell.row, cell.col);
-      const expected = active.grid[cell.row][cell.col].letter;
-      const current = next[key];
-      
-      if (current) {
-        checkedCount++;
-        if (current !== expected) {
-          wrongs.add(key);
-          allCorrect = false;
-        }
-      }
-    });
-
-    setWrongCells(wrongs);
-    
-    if (checkTimerRef.current) clearTimeout(checkTimerRef.current);
-    if (wrongs.size > 0) {
-      checkTimerRef.current = window.setTimeout(() => {
-        setAnswers((prev) => {
-          const cleared = { ...prev };
-          wrongs.forEach((k) => { cleared[k] = ""; });
-          saveProgress(cleared, false);
-          return cleared;
-        });
-        setWrongCells(new Set());
-      }, 800);
-    }
-    
-    if (allCorrect && checkedCount === wordCells.length) {
-      showToast("Word is correct!");
-    }
+    checkCells(wordCells, "Word");
   }
 
   function checkGrid() {
-    const next = { ...answers };
-    const wrongs = new Set<string>();
-    let allCorrect = true;
-    let checkedCount = 0;
-
-    allCells(active).forEach((cell) => {
-      const key = keyFor(cell.row, cell.col);
-      const expected = cell.letter;
-      const current = next[key];
-
-      if (current) {
-        checkedCount++;
-        if (current !== expected) {
-          wrongs.add(key);
-          allCorrect = false;
-        }
-      }
-    });
-
-    setWrongCells(wrongs);
-
-    if (checkTimerRef.current) clearTimeout(checkTimerRef.current);
-    if (wrongs.size > 0) {
-      checkTimerRef.current = window.setTimeout(() => {
-        setAnswers((prev) => {
-          const cleared = { ...prev };
-          wrongs.forEach((k) => { cleared[k] = ""; });
-          saveProgress(cleared, false);
-          return cleared;
-        });
-        setWrongCells(new Set());
-      }, 800);
-    }
-
-    if (allCorrect && checkedCount === allCells(active).length) {
-      showToast("Grid is correct!");
-    }
+    checkCells(allCells(active), "Grid");
   }
 
   function handleNextClue() {
@@ -508,7 +489,7 @@ export default function Page() {
           onPrevClue={handlePrevClue}
         />
         {toastMsg && (
-          <div className="fixed bottom-10 left-1/2 transform -translate-x-1/2 bg-foreground text-background px-4 py-2 rounded shadow-lg z-50 text-sm font-medium animate-in fade-in slide-in-from-bottom-4">
+          <div role="status" className="fixed bottom-10 left-1/2 transform -translate-x-1/2 bg-foreground text-background px-4 py-2 rounded shadow-lg z-50 text-sm font-medium animate-in fade-in slide-in-from-bottom-4">
             {toastMsg}
           </div>
         )}
