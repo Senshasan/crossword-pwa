@@ -3,6 +3,8 @@
 -- its recorded time/date. Without this, Check Grid / Reset on a solved puzzle
 -- (which save completed=false) would erase the completion, and re-opening a
 -- solved puzzle would keep overwriting solve_time_seconds.
+
+DROP FUNCTION IF EXISTS public.get_leaderboard(int);
 CREATE OR REPLACE FUNCTION public.keep_first_clear()
 RETURNS TRIGGER
 LANGUAGE plpgsql
