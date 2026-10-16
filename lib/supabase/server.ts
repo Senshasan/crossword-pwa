@@ -1,3 +1,4 @@
+// Currently unused; kept for server-rendered features (e.g. leaderboard in a Server Component).
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 

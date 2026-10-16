@@ -19,12 +19,10 @@ interface PlayScreenProps {
   direction: Direction;
   activeClue: Clue | undefined;
   wordCells: { row: number; col: number }[];
-  seconds: number;
   time: string;
   inputRef: React.RefObject<HTMLInputElement | null>;
   onKey: (event: React.KeyboardEvent<HTMLInputElement>) => void;
   onCell: (row: number, col: number, toggle: boolean) => void;
-  onDirection: (direction: Direction) => void;
   onClue: (clue: Clue) => void;
   onBack: () => void;
   onCheckWord: () => void;
@@ -44,12 +42,10 @@ export function PlayScreen({
   direction,
   activeClue,
   wordCells,
-  seconds,
   time,
   inputRef,
   onKey,
   onCell,
-  onDirection,
   onClue,
   onBack,
   onCheckWord,

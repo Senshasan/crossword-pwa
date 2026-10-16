@@ -476,12 +476,10 @@ export default function Page() {
           direction={direction}
           activeClue={activeClue}
           wordCells={wordCells}
-          seconds={seconds}
           time={time}
           inputRef={inputRef}
           onKey={handleKey}
           onCell={focusCell}
-          onDirection={setDirection}
           onClue={(clue: Clue) => {
             const cell = firstEmptyCell(clue);
             if (cell) setCursor({ row: cell.row, col: cell.col });
