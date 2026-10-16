@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BookOpen,
   ChevronRight,
@@ -19,6 +19,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePuzzles } from "@/hooks/usePuzzles";
 import { usePuzzleProgress } from "@/hooks/usePuzzleProgress";
 import { useServiceWorker } from "@/hooks/useServiceWorker";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 
 import { AuthScreen } from "@/components/AuthScreen";
 import { ProfileScreen } from "@/components/ProfileScreen";
@@ -26,6 +27,7 @@ import { LoadingScreen } from "@/components/LoadingScreen";
 import { PuzzleCard } from "@/components/PuzzleCard";
 import { PlayScreen } from "@/components/PlayScreen";
 import { UpdateBanner } from "@/components/UpdateBanner";
+import { PullIndicator } from "@/components/PullIndicator";
 
 const keyFor = (row: number, col: number) => `${row}:${col}`;
 const allCells = (p: PuzzleData) =>
@@ -43,7 +45,6 @@ const emptyPuzzle: PuzzleData = {
 
 export default function Page() {
   const supabase = useMemo(() => createClient(), []);
-  // checkForUpdate is wired into pull-to-refresh in Phase 5.
   const { updateReady, applyUpdate, checkForUpdate } = useServiceWorker();
   
   const { user, authChecked, profileReady, name, saveProfile } = useAuth(supabase);
@@ -64,8 +65,16 @@ export default function Page() {
   const [leaderboard, setLeaderboard] = useState<{display_name: string, completed_count: number}[]>([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
 
-  const [touchStartY, setTouchStartY] = useState<number | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  // Pull-to-refresh (and the menu's Refresh): new puzzles and a new app version, together.
+  // Home and Browse only; in Play a downward drag belongs to the grid.
+  const onRefresh = useCallback(async () => {
+    await Promise.allSettled([refetch(), checkForUpdate()]);
+  }, [refetch, checkForUpdate]);
+  const {
+    pull,
+    refreshing: pullRefreshing,
+    refresh: pullRefresh,
+  } = usePullToRefresh(onRefresh, !!user && profileReady && puzzles.length > 0 && view !== "play");
 
   const inputRef = useRef<HTMLInputElement>(null);
   const checkTimerRef = useRef<number | null>(null);
@@ -498,24 +507,8 @@ export default function Page() {
     );
 
   return (
-    <main 
-      className="min-h-screen bg-background text-foreground pull-container pb-safe"
-      onTouchStart={(e) => {
-        if (window.scrollY === 0) setTouchStartY(e.touches[0].clientY);
-      }}
-      onTouchMove={(e) => {
-        if (touchStartY !== null && e.touches[0].clientY - touchStartY > 70) {
-          setIsRefreshing(true);
-        }
-      }}
-      onTouchEnd={() => {
-        if (isRefreshing) {
-          refetch();
-          setTimeout(() => setIsRefreshing(false), 1000);
-        }
-        setTouchStartY(null);
-      }}
-    >
+    <main className="min-h-screen bg-background text-foreground pb-safe">
+      <PullIndicator pull={pull} refreshing={pullRefreshing} />
       <header className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5 sm:px-8 pt-safe">
         <button
           className="flex items-center gap-3"
@@ -527,7 +520,6 @@ export default function Page() {
           <span className="text-lg font-semibold hidden sm:inline">Across & Along</span>
         </button>
         <div className="flex items-center gap-2">
-          {isRefreshing && <Loader2 className="animate-spin text-muted-foreground mr-2" size={18} />}
           <button
             className="icon-button"
             onClick={() => setDark(!dark)}
@@ -580,6 +572,16 @@ export default function Page() {
                   )}
                 </div>
 
+                <button
+                  className="secondary-button w-full mt-2"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    void pullRefresh();
+                  }}
+                  disabled={pullRefreshing}
+                >
+                  <RotateCw size={16} /> Refresh
+                </button>
                 <button
                   className="secondary-button w-full mt-2"
                   onClick={() => {

@@ -66,6 +66,11 @@
 * {
   box-sizing: border-box;
 }
+/* Keep Safari's native bounce from fighting the pull-to-refresh handler. */
+html,
+body {
+  overscroll-behavior-y: contain;
+}
 body {
   margin: 0;
   background: var(--background);
@@ -594,6 +599,57 @@ button {
 
   .play-header h1 {
     font-size: 28px;
+  }
+}
+.pull-indicator {
+  position: fixed;
+  top: env(safe-area-inset-top);
+  left: 50%;
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 40px;
+  height: 40px;
+  justify-content: center;
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: #789482;
+  box-shadow: 0 8px 24px #151d1818;
+  pointer-events: none;
+  transition:
+    transform 0.25s ease,
+    opacity 0.25s ease;
+}
+/* Follow the finger exactly while dragging; spring back only on release. */
+.pull-indicator[data-dragging] {
+  transition: none;
+}
+.pull-arrow {
+  transition: transform 0.2s ease;
+}
+.pull-spinner {
+  animation: pull-spin 1s linear infinite;
+}
+@keyframes pull-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.pull-static-text {
+  display: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+@media (prefers-reduced-motion: reduce) {
+  .pull-spinner {
+    display: none;
+  }
+  .pull-static-text {
+    display: inline;
   }
 }
 @media (prefers-reduced-motion: reduce) {
