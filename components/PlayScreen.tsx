@@ -64,8 +64,8 @@ export function PlayScreen({
   const wordSet = new Set(wordCells.map((c) => keyFor(c.row, c.col)));
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <header className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5 sm:px-8">
+    <main className="min-h-screen bg-background text-foreground pb-safe">
+      <header className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5 sm:px-8 pt-safe">
         <button className="back-link" onClick={onBack}>
           <ChevronLeft size={17} /> Back to puzzles
         </button>

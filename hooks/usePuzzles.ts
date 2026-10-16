@@ -1,74 +1,82 @@
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { createClient } from "@/lib/supabase/client";
 import { type PuzzleData, type PuzzleRow, mapPuzzle } from "@/lib/crossword";
 
 export function usePuzzles(supabase: ReturnType<typeof createClient>, userId: string | undefined) {
   const [puzzles, setPuzzles] = useState<PuzzleData[]>([]);
-  const [puzzleLoading, setPuzzleLoading] = useState(true);
-  const [puzzleError, setPuzzleError] = useState<string | null>(null);
   const [completed, setCompleted] = useState<string[]>([]);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  // puzzleLoading drives the full-screen loader (first load per user only);
+  // refreshing is for manual refetches, which keep the current screen up.
+  const [puzzleLoading, setPuzzleLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  // True when the latest *puzzles* query failed. A failed progress query alone isn't fatal.
+  const [error, setError] = useState(false);
+  // Only the newest request may write state, so a slow response can't overwrite a newer one.
+  const requestId = useRef(0);
 
-  const refetch = useCallback(() => {
-    setRefreshTrigger((prev) => prev + 1);
-  }, []);
-
-  useEffect(() => {
-    let mounted = true;
-
-    async function loadData() {
+  const load = useCallback(
+    async (initial: boolean) => {
+      const id = ++requestId.current;
       if (!userId) {
-        if (mounted) setPuzzleLoading(false);
+        setPuzzleLoading(false);
         return;
       }
 
-      setPuzzleLoading(true);
-      setPuzzleError(null);
+      if (initial) {
+        setPuzzleLoading(true);
+        setPuzzles([]);
+        setCompleted([]);
+      } else {
+        setRefreshing(true);
+      }
 
       const [progressResponse, puzzlesResponse] = await Promise.all([
-        supabase
-          .from("puzzle_progress")
-          .select("puzzle_id, completed")
-          .eq("user_id", userId),
+        supabase.from("puzzle_progress").select("puzzle_id, completed").eq("user_id", userId),
         supabase
           .from("puzzles")
           .select("id,title,puzzle_type,order_index,width,height,grid,clues,author_name,congrats_message")
-          .order("order_index")
+          .order("order_index"),
       ]);
 
-      if (!mounted) return;
+      if (id !== requestId.current) return;
 
       if (progressResponse.error) {
-        console.error("Error fetching progress:", progressResponse.error);
-        setPuzzleError("Failed to load your progress.");
-      } else if (progressResponse.data) {
+        console.error("[usePuzzles] puzzle_progress query failed:", progressResponse.error);
+      } else {
         setCompleted(
-          progressResponse.data
-            .filter((row: any) => row.completed)
-            .map((row: any) => row.puzzle_id)
+          (progressResponse.data as { puzzle_id: string; completed: boolean }[])
+            .filter((row) => row.completed)
+            .map((row) => row.puzzle_id),
         );
       }
 
       if (puzzlesResponse.error) {
-        console.error("Error fetching puzzles:", puzzlesResponse.error);
-        setPuzzleError("Failed to load puzzles. Please check your connection or database schema.");
-      } else if (puzzlesResponse.data) {
+        console.error("[usePuzzles] puzzles query failed:", puzzlesResponse.error);
+        setError(true);
+      } else {
+        setError(false);
         setPuzzles(
           (puzzlesResponse.data as PuzzleRow[])
             .map(mapPuzzle)
-            .filter((puzzle): puzzle is PuzzleData => puzzle !== null)
+            .filter((puzzle): puzzle is PuzzleData => puzzle !== null),
         );
       }
-      
+
       setPuzzleLoading(false);
-    }
+      setRefreshing(false);
+    },
+    [supabase, userId],
+  );
 
-    void loadData();
-
+  useEffect(() => {
+    void load(true);
+    // Invalidate any in-flight request when the user changes or the component unmounts.
     return () => {
-      mounted = false;
+      requestId.current++;
     };
-  }, [supabase, userId, refreshTrigger]);
+  }, [load]);
 
-  return { puzzles, puzzleLoading, puzzleError, completed, setCompleted, refetch };
+  const refetch = useCallback(() => load(false), [load]);
+
+  return { puzzles, puzzleLoading, refreshing, error, completed, setCompleted, refetch };
 }

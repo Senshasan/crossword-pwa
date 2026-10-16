@@ -11,6 +11,6 @@ export const metadata: Metadata = {
   icons: { icon: '/icon.svg', apple: '/apple-icon.png' },
 }
 
-export const viewport: Viewport = { colorScheme: 'light dark', themeColor: [{ media: '(prefers-color-scheme: light)', color: '#f7f7f4' }, { media: '(prefers-color-scheme: dark)', color: '#1d211f' }] }
+export const viewport: Viewport = { viewportFit: 'cover', colorScheme: 'light dark', themeColor: [{ media: '(prefers-color-scheme: light)', color: '#f7f7f4' }, { media: '(prefers-color-scheme: dark)', color: '#1d211f' }] }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) { return <html lang="en"><body className="antialiased">{children}</body></html> }

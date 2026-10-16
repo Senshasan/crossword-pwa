@@ -4,11 +4,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BookOpen,
   ChevronRight,
+  CloudOff,
   Grid2X2,
   LogOut,
   Moon,
   Sun,
   Loader2,
+  RotateCw,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { type Clue, type Direction, type PuzzleData } from "@/lib/crossword";
@@ -45,7 +47,7 @@ export default function Page() {
   const { updateReady, applyUpdate, checkForUpdate } = useServiceWorker();
   
   const { user, authChecked, profileReady, name, saveProfile } = useAuth(supabase);
-  const { puzzles, puzzleLoading, puzzleError, completed, setCompleted, refetch } = usePuzzles(supabase, user?.id);
+  const { puzzles, puzzleLoading, refreshing, error, completed, setCompleted, refetch } = usePuzzles(supabase, user?.id);
 
   const [dark, setDark] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -57,7 +59,7 @@ export default function Page() {
   const [modal, setModal] = useState(false);
   const [wrongCells, setWrongCells] = useState<Set<string>>(new Set());
   const [toastMsg, setToastMsg] = useState("");
-  const [isStandalone, setIsStandalone] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(true); // true by default: no flash of the hint
   
   const [leaderboard, setLeaderboard] = useState<{display_name: string, completed_count: number}[]>([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
@@ -421,21 +423,28 @@ export default function Page() {
   if (!profileReady) return <ProfileScreen onSave={saveProfile} />;
   if (puzzleLoading) return <LoadingScreen />;
 
-  if (puzzleError)
+  // Nothing to show at all: full-screen error. A failed refresh while puzzles are
+  // already on screen is handled by the inline notice in the home/browse view instead.
+  if (error && !puzzles.length)
     return (
       <main className="auth-shell">
         <div className="auth-card">
-          <span className="brand-mark bg-red-600">
-            <Grid2X2 size={19} />
+          <span className="brand-mark">
+            <CloudOff size={19} />
           </span>
           <h1 className="mt-5 text-2xl font-semibold">
-            Oops, something went wrong
+            Couldn&apos;t load your puzzles.
           </h1>
           <p className="mt-3 text-sm text-muted-foreground">
-            {puzzleError}
+            Check your connection and try again. Your progress is saved.
           </p>
-          <button className="primary-button mt-6" onClick={refetch}>
-            Try again
+          <button
+            className="primary-button mt-6 w-full"
+            onClick={() => void refetch()}
+            disabled={refreshing}
+          >
+            {refreshing ? <Loader2 className="animate-spin" size={16} /> : <RotateCw size={16} />}
+            {refreshing ? "Trying again…" : "Try again"}
           </button>
         </div>
       </main>
@@ -454,8 +463,13 @@ export default function Page() {
           <p className="mt-3 text-sm text-muted-foreground">
             No puzzles have been added yet.
           </p>
-          <button className="secondary-button mt-6 w-full" onClick={refetch}>
-            Refresh
+          <button
+            className="secondary-button mt-6 w-full"
+            onClick={() => void refetch()}
+            disabled={refreshing}
+          >
+            {refreshing ? <Loader2 className="animate-spin" size={16} /> : <RotateCw size={16} />}
+            {refreshing ? "Checking…" : "Refresh"}
           </button>
         </div>
       </main>
@@ -504,7 +518,7 @@ export default function Page() {
 
   return (
     <main 
-      className="min-h-screen bg-background text-foreground pull-container"
+      className="min-h-screen bg-background text-foreground pull-container pb-safe"
       onTouchStart={(e) => {
         if (window.scrollY === 0) setTouchStartY(e.touches[0].clientY);
       }}
@@ -600,11 +614,21 @@ export default function Page() {
         </div>
       </header>
 
+      {error && (
+        <div role="alert" className="refresh-notice">
+          <CloudOff size={18} />
+          <p className="text-sm">Couldn&apos;t refresh. Showing your puzzles from earlier.</p>
+          <button className="browse-link" onClick={() => void refetch()} disabled={refreshing}>
+            {refreshing ? "Trying…" : "Try again"}
+          </button>
+        </div>
+      )}
+
       {view === "browse" ? (
-        <section className="mx-auto max-w-6xl px-5 pb-safe sm:px-8 mt-8">
+        <section className="mx-auto max-w-6xl px-5 sm:px-8 mt-8">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
             <h1 className="text-3xl font-semibold">Browse Puzzles</h1>
-            <button className="browse-link shrink-0 whitespace-nowrap" onClick={() => setView("home")}>
+            <button className="browse-link" onClick={() => setView("home")}>
               Back to Home
             </button>
           </div>
@@ -637,7 +661,7 @@ export default function Page() {
           </div>
         </section>
       ) : (
-        <section className="mx-auto max-w-6xl px-5 pb-safe sm:px-8">
+        <section className="mx-auto max-w-6xl px-5 sm:px-8">
           <div className="hero">
             <div>
               <p className="eyebrow sage">Your private collection</p>
@@ -665,7 +689,7 @@ export default function Page() {
                 Pick up where you left off
               </h2>
             </div>
-            <button className="browse-link shrink-0 whitespace-nowrap" onClick={() => setView("browse")}>
+            <button className="browse-link" onClick={() => setView("browse")}>
               Browse all <ChevronRight size={16} />
             </button>
           </div>
@@ -695,7 +719,7 @@ export default function Page() {
               <p className="eyebrow">The collection</p>
               <h2 className="mt-2 text-2xl font-semibold">All puzzles</h2>
             </div>
-            <button className="browse-link shrink-0 whitespace-nowrap" onClick={() => setView("browse")}>
+            <button className="browse-link" onClick={() => setView("browse")}>
               See collection <ChevronRight size={16} />
             </button>
           </div>
