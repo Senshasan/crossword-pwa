@@ -30,8 +30,8 @@ export function LeaderboardPodium({
 
   return (
     <div>
-      <p className="eyebrow flex items-center gap-2 mb-3">
-        <Trophy size={14} /> Puzzles solved
+      <p className="mb-3 flex items-center gap-2 text-sm font-semibold">
+        <Trophy size={15} className="text-brand-ink" /> Puzzles solved
       </p>
       <div className="flex items-end justify-center gap-2">
         {SLOT.map(({ rank, idx, height, order }) => {
@@ -48,7 +48,7 @@ export function LeaderboardPodium({
               </span>
               <div
                 className={`${height} flex w-full items-start justify-center rounded-t-lg border border-border pt-2 ${
-                  rank === 1 ? "bg-primary text-primary-foreground" : "bg-secondary"
+                  rank === 1 ? "border-transparent bg-brand-strong text-white" : "bg-secondary"
                 }`}
               >
                 <span className="text-lg font-semibold leading-none">{row.completed_count}</span>

@@ -35,7 +35,9 @@ Env vars (`.env.local`): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLI
 
 ## Architecture
 
-**A client-side SPA in one route.** `app/page.tsx` (`"use client"`) is the coordinator for the whole app. It switches between `home` / `browse` / `play` views with local state (no router navigation), and it holds the crossword engine logic: cursor movement, direction toggle, word cells, check word/grid, prev/next clue. The presentational screens in `components/` (`AuthScreen`, `ProfileScreen`, `PlayScreen`, `PuzzleCard`, `LoadingScreen`) get their state and callbacks as props. `components/ui/` holds shadcn components (style `base-nova`, built on `@base-ui/react`). Tailwind v4 is configured CSS-first in `app/globals.css`, and dark mode is a `.dark` class on `<html>`.
+**A client-side SPA in one route.** `app/page.tsx` (`"use client"`) is the coordinator for the whole app. It switches between `home` / `browse` / `play` views with local state (no router navigation), and it holds the crossword engine logic: cursor movement, direction toggle, word cells, check word/grid, prev/next clue. The presentational screens in `components/` (`AppHeader`, `HomeScreen`, `BrowseScreen`, `PlayScreen`, `AuthScreen`, `ProfileScreen`, `LoadingScreen`) get their state and callbacks as props. `components/ui/` holds shadcn components (style `base-nova`, built on `@base-ui/react`).
+
+**Visual system.** Tailwind v4 is configured CSS-first in `app/globals.css`, where the colour tokens (paper/ink, sage `--brand*` for the collection, coral `--family*` for puzzles from family, grid `--cell*`/`--block`) are defined for light and `.dark`. Fonts come from `next/font` in `app/layout.tsx`: Newsreader for headings and clue text, Schibsted Grotesk for UI and grid letters. Dark mode is a `.dark` class on `<html>`, set before first paint by an inline script in `layout.tsx` (saved choice in `localStorage.theme`, else the system setting). Puzzle previews use `PuzzleThumb` (block pattern only), so they never show answer letters. Category labels come from `categoryLabel()` in `components/PuzzleBits.tsx`. `components/BrandMark.tsx` and `public/icon.svg` are the same drawing; the PNG icons (`apple-icon.png`, `icon-192.png`, `icon-512.png`) were rendered from it.
 
 **Data flow through hooks**, each of which takes the singleton browser Supabase client from `lib/supabase/client.ts`:
 - `useAuth`: OTP email auth plus the `profiles.display_name` onboarding step. It uses a typed 6-digit code, not a magic link, because a magic link would open Safari outside the installed PWA. This needs the Supabase email template to include `{{ .Token }}`, which is set in the dashboard, not in code.
@@ -55,3 +57,13 @@ Env vars (`.env.local`): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLI
 ## Docs
 
 `docs/` holds review and handoff notes from earlier rounds (`handoff (1).md`, `bug-report.md`, `fix-verification-and-review.md`, `round3-report-and-plan.md`) plus this round's `implementation-plan.md` and `drop-in/` reference files. The older notes explain design decisions and list known issues. Parts of the handoff are out of date: the env var mismatch and the missing migrations have since been fixed. Treat the code as the source of truth.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

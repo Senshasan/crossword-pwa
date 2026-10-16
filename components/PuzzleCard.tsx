@@ -1,5 +1,6 @@
 import { Check } from "lucide-react";
 import { type PuzzleData } from "@/lib/crossword";
+import { CategoryTag, PuzzleThumb } from "@/components/PuzzleBits";
 
 export function PuzzleCard({
   puzzle,
@@ -11,31 +12,23 @@ export function PuzzleCard({
   onOpen: (p: PuzzleData) => void;
 }) {
   return (
-    <button className="puzzle-card text-left" onClick={() => onOpen(puzzle)}>
-      <div
-        className={`mini-grid ${puzzle.category === "custom" ? "coral" : "sage"}`}
-      >
-        {puzzle.grid[0].slice(0, 3).map((cell, i) => (
-          <span key={i}>{cell.letter}</span>
-        ))}
+    <button
+      className={`puzzle-card ${puzzle.category === "custom" ? "family" : ""}`}
+      onClick={() => onOpen(puzzle)}
+    >
+      <div className="thumb-wrap">
+        <PuzzleThumb puzzle={puzzle} solved={done} />
       </div>
       <div className="card-content">
-        <div className="flex items-center justify-between">
-          <span
-            className={`eyebrow ${puzzle.category === "custom" ? "coral" : "sage"}`}
-          >
-            {puzzle.category}
-          </span>
+        <h3>{puzzle.title}</h3>
+        <div className="meta mt-2">
+          <CategoryTag puzzle={puzzle} />
           {done && (
             <span className="done-badge">
-              <Check size={12} /> Done
+              <Check size={13} strokeWidth={2.5} /> Solved
             </span>
           )}
         </div>
-        <h3 className="mt-3 font-semibold">{puzzle.title}</h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {puzzle.clues.across[0]?.text ?? ""}
-        </p>
       </div>
     </button>
   );

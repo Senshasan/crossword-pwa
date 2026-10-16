@@ -1,22 +1,25 @@
-import {
-  ArrowDown,
-  ArrowRight,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Clock3,
-  RotateCcw,
-  X,
-} from "lucide-react";
-import { type Clue, type Direction, type PuzzleData } from "@/lib/crossword";
+import { useEffect, useRef, useState } from "react";
+import { Check, ChevronLeft, ChevronRight, Clock3, RotateCcw, X } from "lucide-react";
+import { type Clue, type PuzzleData } from "@/lib/crossword";
+import { CategoryTag } from "@/components/PuzzleBits";
 
 const keyFor = (row: number, col: number) => `${row}:${col}`;
+
+function wordKeys(puzzle: PuzzleData, clue: Clue) {
+  const keys: string[] = [];
+  for (
+    let r = clue.row, c = clue.col;
+    r < puzzle.dimensions.rows && c < puzzle.dimensions.cols && !puzzle.grid[r][c].isBlocked;
+    clue.direction === "across" ? c++ : r++
+  )
+    keys.push(keyFor(r, c));
+  return keys;
+}
 
 interface PlayScreenProps {
   active: PuzzleData;
   answers: Record<string, string>;
   cursor: { row: number; col: number };
-  direction: Direction;
   activeClue: Clue | undefined;
   wordCells: { row: number; col: number }[];
   time: string;
@@ -39,7 +42,6 @@ export function PlayScreen({
   active,
   answers,
   cursor,
-  direction,
   activeClue,
   wordCells,
   time,
@@ -58,30 +60,51 @@ export function PlayScreen({
   onPrevClue,
 }: PlayScreenProps) {
   const wordSet = new Set(wordCells.map((c) => keyFor(c.row, c.col)));
+  const isActive = (clue: Clue) =>
+    activeClue?.number === clue.number && activeClue?.direction === clue.direction;
+
+  // Reset wipes the grid, so it takes a second tap within 3 seconds.
+  const [resetArmed, setResetArmed] = useState(false);
+  const resetTimer = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (resetTimer.current) clearTimeout(resetTimer.current);
+  }, []);
+  function handleReset() {
+    if (resetTimer.current) clearTimeout(resetTimer.current);
+    if (resetArmed) {
+      setResetArmed(false);
+      onReset();
+      return;
+    }
+    setResetArmed(true);
+    resetTimer.current = window.setTimeout(() => setResetArmed(false), 3000);
+  }
+
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (modal) closeRef.current?.focus();
+  }, [modal]);
 
   return (
     <main className="min-h-screen bg-background text-foreground pb-safe">
-      <header className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5 sm:px-8 pt-safe">
+      <header className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4 sm:px-8 pt-safe">
         <button className="back-link" onClick={onBack}>
-          <ChevronLeft size={17} /> Back to puzzles
+          <ChevronLeft size={18} /> Puzzles
         </button>
-        <div className="timer">
-          <Clock3 size={17} /> {time}
+        <div className="timer" aria-label={`Time ${time}`}>
+          <Clock3 size={16} /> {time}
         </div>
       </header>
       <section className="mx-auto max-w-6xl px-5 pb-12 sm:px-8">
         <div className="play-header">
           <div>
-            <span
-              className={`eyebrow ${active.category === "custom" ? "coral" : "sage"}`}
-            >
-              {active.category === "custom"
-                ? "Family custom"
-                : "Standard puzzle"}
-            </span>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-              {active.title}
-            </h1>
+            <h1>{active.title}</h1>
+            <div className="meta mt-2">
+              <CategoryTag puzzle={active} />
+              <span>
+                {active.dimensions.cols}×{active.dimensions.rows}
+              </span>
+            </div>
           </div>
         </div>
         <input
@@ -95,13 +118,27 @@ export function PlayScreen({
           inputMode="text"
           aria-label="Type crossword letters"
         />
-        <div className="play-layout mt-8">
+        <div className="play-layout">
           <div className="grid-wrap">
+            <div className="clue-bar" aria-live="polite">
+              <p className="clue-text">
+                {activeClue && (
+                  <span className="clue-ref">
+                    {activeClue.number} {activeClue.direction === "across" ? "Across" : "Down"}
+                  </span>
+                )}
+                {activeClue?.text}
+              </p>
+              <button className="icon-button" onClick={onPrevClue} aria-label="Previous clue">
+                <ChevronLeft size={18} />
+              </button>
+              <button className="icon-button" onClick={onNextClue} aria-label="Next clue">
+                <ChevronRight size={18} />
+              </button>
+            </div>
             <div
-              className="crossword-grid real-grid"
-              style={{
-                gridTemplateColumns: `repeat(${active.dimensions.cols}, minmax(0, 1fr))`,
-              }}
+              className="crossword-grid"
+              style={{ gridTemplateColumns: `repeat(${active.dimensions.cols}, minmax(0, 1fr))` }}
               role="grid"
               onClick={() => inputRef.current?.focus()}
             >
@@ -116,117 +153,83 @@ export function PlayScreen({
                         event.stopPropagation();
                         onCell(r, c, cursor.row === r && cursor.col === c);
                       }}
-                      aria-label={`Row ${r + 1}, column ${c + 1}`}
+                      aria-label={
+                        cell.isBlocked
+                          ? "Blocked"
+                          : `Row ${r + 1}, column ${c + 1}${answers[key] ? `, ${answers[key]}` : ", empty"}`
+                      }
                       tabIndex={cell.isBlocked ? -1 : 0}
                       disabled={cell.isBlocked}
                     >
-                      {cell.clueNumber !== undefined && (
-                        <small>{cell.clueNumber}</small>
-                      )}
+                      {cell.clueNumber !== undefined && <small>{cell.clueNumber}</small>}
                       {answers[key] ?? ""}
                     </button>
                   );
                 }),
               )}
             </div>
-            <div className="grid-controls flex gap-2 mt-4">
-              <button className="secondary-button" onClick={onReset}>
-                <RotateCcw size={16} /> Reset
-              </button>
+            <div className="grid-controls">
               <button className="secondary-button" onClick={onCheckWord}>
-                Check Word
+                Check word
               </button>
               <button className="secondary-button" onClick={onCheckGrid}>
-                Check Grid
+                Check puzzle
+              </button>
+              <button
+                className="quiet-button"
+                onClick={handleReset}
+                data-armed={resetArmed ? "" : undefined}
+              >
+                <RotateCcw size={16} /> {resetArmed ? "Clear grid?" : "Reset"}
               </button>
             </div>
           </div>
           <aside className="clue-card">
-            <div className="sticky-clue">
-              <div className="flex items-center justify-between w-full">
-                <div className="flex items-center gap-2">
-                  <span className="clue-number">{activeClue?.number}</span>
-                  <span className="clue-dir" aria-label={activeClue?.direction}>
-                    {activeClue?.direction === "across" ? (
-                      <ArrowRight size={14} />
-                    ) : (
-                      <ArrowDown size={14} />
-                    )}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button className="icon-button" onClick={onPrevClue} aria-label="Previous clue">
-                    <ChevronLeft size={16} />
-                  </button>
-                  <button className="icon-button" onClick={onNextClue} aria-label="Next clue">
-                    <ChevronRight size={16} />
-                  </button>
-                </div>
+            {(["across", "down"] as const).map((dir) => (
+              <div className="clue-section" key={dir}>
+                <h2>{dir === "across" ? "Across" : "Down"}</h2>
+                {active.clues[dir].map((clue) => {
+                  const filled = wordKeys(active, clue).every((k) => answers[k]);
+                  return (
+                    <button
+                      key={`${dir}-${clue.number}`}
+                      className={`clue-row ${isActive(clue) ? "active" : ""} ${filled && !isActive(clue) ? "solved" : ""}`}
+                      aria-current={isActive(clue) ? "true" : undefined}
+                      onClick={() => onClue(clue)}
+                    >
+                      <span className="clue-number">{clue.number}</span>
+                      <span>{clue.text}</span>
+                    </button>
+                  );
+                })}
               </div>
-              <p className="mt-2">{activeClue?.text}</p>
-            </div>
-            <div className="clue-list">
-              {[...active.clues.across, ...active.clues.down]
-                .sort((a, b) =>
-                  a.number !== b.number
-                    ? a.number - b.number
-                    : a.direction === "across"
-                      ? -1
-                      : 1,
-                )
-                .map((clue: Clue) => (
-                  <button
-                    key={`${clue.direction}-${clue.number}`}
-                    className={`clue-row ${activeClue?.number === clue.number && activeClue?.direction === clue.direction ? "active" : ""}`}
-                    onClick={() => onClue(clue)}
-                  >
-                    <span className="clue-number">{clue.number}</span>
-                    <span className="clue-dir" aria-label={clue.direction}>
-                      {clue.direction === "across" ? (
-                        <ArrowRight size={14} />
-                      ) : (
-                        <ArrowDown size={14} />
-                      )}
-                    </span>
-                    <span>{clue.text}</span>
-                  </button>
-                ))}
-            </div>
+            ))}
           </aside>
         </div>
       </section>
       {modal && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true">
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="solved-title">
           <div className="success-modal">
-            <button
-              className="modal-close"
-              onClick={onCloseModal}
-              aria-label="Close"
-            >
+            <button ref={closeRef} className="modal-close" onClick={onCloseModal} aria-label="Close">
               <X size={18} />
             </button>
-            <span className="brand-mark large">
-              <Check size={25} />
+            <span className="mx-auto grid size-14 place-items-center rounded-full bg-brand-tint text-brand-ink">
+              <Check size={28} strokeWidth={2.5} />
             </span>
-            <p className="eyebrow sage mt-6">Puzzle complete</p>
-            <h2 className="mt-2 text-3xl font-semibold">Well done.</h2>
-            <p className="mt-3 text-muted-foreground">Solved in {time}.</p>
-            {active.category === "custom" && (
-              <p className="mt-5 leading-6">
-                {active.congratsMessage}
-                <br />
-                {active.authorName && (
-                  <span className="text-sm text-muted-foreground">
-                    — {active.authorName}
-                  </span>
-                )}
-              </p>
+            <h2 id="solved-title" className="mt-5">
+              Solved.
+            </h2>
+            <p className="mt-2 text-muted-foreground">
+              {active.title} in <span className="font-semibold tabular-nums text-foreground">{time}</span>
+            </p>
+            {active.category === "custom" && active.congratsMessage && (
+              <figure className="family-note">
+                <p>{active.congratsMessage}</p>
+                {active.authorName && <cite>— {active.authorName}</cite>}
+              </figure>
             )}
-            <button
-              className="primary-button mt-7 w-full"
-              onClick={onCloseModal}
-            >
-              Keep solving
+            <button className="primary-button mt-7 w-full" onClick={onBack}>
+              Back to puzzles
             </button>
           </div>
         </div>

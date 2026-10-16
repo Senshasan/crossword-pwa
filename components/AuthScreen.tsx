@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Grid2X2, ChevronRight, ChevronLeft } from "lucide-react";
+import { ChevronRight, ChevronLeft } from "lucide-react";
 import type { createClient } from "@/lib/supabase/client";
+import { BrandMark } from "@/components/BrandMark";
 
 export function AuthScreen({
   supabase,
@@ -37,26 +38,31 @@ export function AuthScreen({
   return (
     <main className="auth-shell">
       <form className="auth-card" onSubmit={submit}>
-        <span className="brand-mark">
-          <Grid2X2 size={19} />
-        </span>
-        <p className="eyebrow mt-8">A private family collection</p>
-        <h1 className="mt-3 text-3xl font-semibold">
-          Welcome to Across & Along
+        <BrandMark className="brand-mark large" />
+        <h1 className="mt-6">
+          {step === "email" ? "Welcome to Across & Along" : "Check your email"}
         </h1>
-        <p className="mt-3 text-sm leading-6 text-muted-foreground">
-          Sign in with a one-time code. No password to remember, no ads.
+        <p className="mt-3 text-[15px] leading-6 text-muted-foreground">
+          {step === "email" ? (
+            "A private crossword collection for family and friends. Sign in with a one-time code: no password, no ads."
+          ) : (
+            <>
+              We sent a 6-digit code to <span className="font-semibold text-foreground">{email.trim()}</span>.
+            </>
+          )}
         </p>
-        <label className="mt-8 block text-sm font-medium" htmlFor="auth-value">
+        <label className="mt-7 block text-sm font-semibold" htmlFor="auth-value">
           {step === "email" ? "Email address" : "6-digit code"}
         </label>
         <input
-          className="auth-input mt-2"
+          key={step}
+          className={`auth-input mt-2 ${step === "code" ? "code" : ""}`}
           id="auth-value"
           required
           autoFocus
           type={step === "email" ? "email" : "text"}
           inputMode={step === "email" ? "email" : "numeric"}
+          autoComplete={step === "email" ? "email" : "one-time-code"}
           maxLength={step === "code" ? 6 : undefined}
           value={step === "email" ? email : code}
           onChange={(e) =>
@@ -64,27 +70,31 @@ export function AuthScreen({
               ? setEmail(e.target.value)
               : setCode(e.target.value.replace(/\D/g, "").slice(0, 6))
           }
-          placeholder={step === "email" ? "you@example.com" : "000000"}
+          placeholder={step === "email" ? "you@example.com" : "••••••"}
         />
         <button className="primary-button mt-4 w-full" disabled={busy}>
           {busy
             ? "Please wait…"
             : step === "email"
               ? "Send me a code"
-              : "Enter the collection"}{" "}
-          <ChevronRight size={17} />
+              : "Enter the collection"}
+          {!busy && <ChevronRight size={17} />}
         </button>
         {step === "code" && (
           <button
             type="button"
-            className="back-link mx-auto mt-4"
-            onClick={() => setStep("email")}
+            className="back-link mx-auto mt-3 flex"
+            onClick={() => {
+              setStep("email");
+              setCode("");
+              setMessage("");
+            }}
           >
             <ChevronLeft size={17} /> Use a different email
           </button>
         )}
         {message && (
-          <p className="mt-4 text-sm text-coral" role="alert">
+          <p className="mt-4 text-sm text-danger" role="alert">
             {message}
           </p>
         )}
