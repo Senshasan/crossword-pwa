@@ -280,19 +280,21 @@ export default function Page() {
     if (event.key === "Backspace") {
       event.preventDefault();
       cancelPendingCheck();
-      const current = keyFor(cursor.row, cursor.col);
-      if (answers[current]) {
-        setAnswers({ ...answers, [current]: "" });
-      } else {
+      // Clear the current cell, or if it's already empty, step back and clear that one.
+      let target = keyFor(cursor.row, cursor.col);
+      if (!answers[target]) {
         const index = wordCells.findIndex(
           (c) => c.row === cursor.row && c.col === cursor.col,
         );
         const previous = wordCells[index - 1];
-        if (previous) {
-          setCursor({ row: previous.row, col: previous.col });
-          setAnswers({ ...answers, [keyFor(previous.row, previous.col)]: "" });
-        }
+        if (!previous) return;
+        setCursor({ row: previous.row, col: previous.col });
+        target = keyFor(previous.row, previous.col);
       }
+      if (!answers[target]) return; // nothing to delete, nothing to save
+      const next = { ...answers, [target]: "" };
+      setAnswers(next);
+      saveProgress(next, isDone);
       return;
     }
     if (
