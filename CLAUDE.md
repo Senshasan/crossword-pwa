@@ -56,7 +56,9 @@ Env vars (`.env.local`): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLI
 
 ## Docs
 
-`docs/` holds review and handoff notes from earlier rounds (`handoff (1).md`, `bug-report.md`, `fix-verification-and-review.md`, `round3-report-and-plan.md`) plus this round's `implementation-plan.md` and `drop-in/` reference files. The older notes explain design decisions and list known issues. Parts of the handoff are out of date: the env var mismatch and the missing migrations have since been fixed. Treat the code as the source of truth.
+**Start with `docs/project-status.md`**: it records current progress, open items and what still needs verifying on a phone. Update it when meaningful work lands.
+
+`docs/` also holds review and handoff notes from earlier rounds (`handoff (1).md`, `bug-report.md`, `fix-verification-and-review.md`, `round3-report-and-plan.md`) plus this round's `implementation-plan.md` and `drop-in/` reference files. The older notes explain design decisions and list known issues. Parts of the handoff are out of date: the env var mismatch and the missing migrations have since been fixed. Treat the code as the source of truth.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
