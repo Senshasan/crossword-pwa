@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { BrandMark } from "@/components/BrandMark";
+import { de } from "@/lib/strings";
+
+const t = de.profile;
 
 export function ProfileScreen({
   onSave,
@@ -19,12 +22,12 @@ export function ProfileScreen({
         }}
       >
         <BrandMark className="brand-mark large" />
-        <h1 className="mt-6">What should we call you?</h1>
+        <h1 className="mt-6">{t.title}</h1>
         <p className="mt-3 text-[15px] leading-6 text-muted-foreground">
-          This is the name family and friends will see on the leaderboard.
+          {t.text}
         </p>
         <label className="mt-7 block text-sm font-semibold" htmlFor="profile-name">
-          Your name
+          {t.label}
         </label>
         <input
           className="auth-input mt-2"
@@ -35,10 +38,10 @@ export function ProfileScreen({
           maxLength={80}
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          placeholder="e.g. Grandma Rose"
+          placeholder={t.placeholder}
         />
         <button className="primary-button mt-4 w-full">
-          Save my name <ChevronRight size={17} />
+          {t.save} <ChevronRight size={17} />
         </button>
       </form>
     </main>

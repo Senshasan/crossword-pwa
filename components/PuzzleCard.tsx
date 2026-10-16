@@ -1,6 +1,7 @@
 import { Check } from "lucide-react";
 import { type PuzzleData } from "@/lib/crossword";
 import { CategoryTag, PuzzleThumb } from "@/components/PuzzleBits";
+import { de } from "@/lib/strings";
 
 export function PuzzleCard({
   puzzle,
@@ -25,7 +26,7 @@ export function PuzzleCard({
           <CategoryTag puzzle={puzzle} />
           {done && (
             <span className="done-badge">
-              <Check size={13} strokeWidth={2.5} /> Solved
+              <Check size={13} strokeWidth={2.5} /> {de.puzzle.solved}
             </span>
           )}
         </div>

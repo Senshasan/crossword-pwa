@@ -1,14 +1,15 @@
 import type { Metadata, Viewport } from 'next'
 import { Newsreader, Schibsted_Grotesk } from 'next/font/google'
 import './globals.css'
+import { de } from '@/lib/strings'
 
 // Sunday-paper pairing: a newspaper serif for headings and clues, a news-house grotesk for UI and grid letters.
 const display = Newsreader({ subsets: ['latin'], variable: '--font-display-face', display: 'swap', style: ['normal', 'italic'] })
 const sans = Schibsted_Grotesk({ subsets: ['latin'], variable: '--font-sans-face', display: 'swap' })
 
 export const metadata: Metadata = {
-  title: 'Across & Along — A family crossword collection',
-  description: 'A private, ad-free crossword collection made for family and friends.',
+  title: de.meta.title,
+  description: de.meta.description,
   applicationName: 'Across & Along',
   manifest: '/manifest.json',
   appleWebApp: { capable: true, title: 'Across & Along', statusBarStyle: 'black-translucent' },
@@ -22,7 +23,7 @@ const themeScript = `try{var t=localStorage.getItem('theme');var d=t?t==='dark':
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${display.variable} ${sans.variable}`} suppressHydrationWarning>
+    <html lang="de" className={`${display.variable} ${sans.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>

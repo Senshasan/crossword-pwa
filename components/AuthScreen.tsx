@@ -1,7 +1,23 @@
 import { useState } from "react";
 import { ChevronRight, ChevronLeft } from "lucide-react";
+import { isAuthApiError, isAuthRetryableFetchError } from "@supabase/supabase-js";
 import type { createClient } from "@/lib/supabase/client";
 import { BrandMark } from "@/components/BrandMark";
+import { de } from "@/lib/strings";
+
+const t = de.auth;
+
+// Supabase returns English server text; never show it, map it to a German message.
+function authErrorMessage(error: unknown) {
+  if (isAuthRetryableFetchError(error) || !navigator.onLine) return t.errors.network;
+  if (isAuthApiError(error)) {
+    if (error.status === 429 || error.code?.startsWith("over_")) return t.errors.rateLimit;
+    // A wrong code and an expired code both come back as otp_expired.
+    if (error.code === "otp_expired") return t.errors.invalidCode;
+    if (error.code === "email_address_invalid" || error.code === "validation_failed") return t.errors.invalidEmail;
+  }
+  return t.errors.generic;
+}
 
 export function AuthScreen({
   supabase,
@@ -31,7 +47,7 @@ export function AuthScreen({
           });
     setBusy(false);
     if (result.error)
-      setMessage("That request could not be completed. Please try again.");
+      setMessage(authErrorMessage(result.error));
     else setStep("code");
   }
 
@@ -40,19 +56,21 @@ export function AuthScreen({
       <form className="auth-card" onSubmit={submit}>
         <BrandMark className="brand-mark large" />
         <h1 className="mt-6">
-          {step === "email" ? "Welcome to Across & Along" : "Check your email"}
+          {step === "email" ? t.welcome : t.checkEmail}
         </h1>
         <p className="mt-3 text-[15px] leading-6 text-muted-foreground">
           {step === "email" ? (
-            "A private crossword collection for family and friends. Sign in with a one-time code: no password, no ads."
+            t.intro
           ) : (
             <>
-              We sent a 6-digit code to <span className="font-semibold text-foreground">{email.trim()}</span>.
+              {t.codeSentBefore}
+              <span className="font-semibold text-foreground">{email.trim()}</span>
+              {t.codeSentAfter}
             </>
           )}
         </p>
         <label className="mt-7 block text-sm font-semibold" htmlFor="auth-value">
-          {step === "email" ? "Email address" : "6-digit code"}
+          {step === "email" ? t.emailLabel : t.codeLabel}
         </label>
         <input
           key={step}
@@ -70,14 +88,14 @@ export function AuthScreen({
               ? setEmail(e.target.value)
               : setCode(e.target.value.replace(/\D/g, "").slice(0, 6))
           }
-          placeholder={step === "email" ? "you@example.com" : "••••••"}
+          placeholder={step === "email" ? t.emailPlaceholder : "••••••"}
         />
         <button className="primary-button mt-4 w-full" disabled={busy}>
           {busy
-            ? "Please wait…"
+            ? t.wait
             : step === "email"
-              ? "Send me a code"
-              : "Enter the collection"}
+              ? t.sendCode
+              : t.enter}
           {!busy && <ChevronRight size={17} />}
         </button>
         {step === "code" && (
@@ -90,7 +108,7 @@ export function AuthScreen({
               setMessage("");
             }}
           >
-            <ChevronLeft size={17} /> Use a different email
+            <ChevronLeft size={17} /> {t.otherEmail}
           </button>
         )}
         {message && (

@@ -1,4 +1,7 @@
 import { Trophy } from "lucide-react";
+import { de } from "@/lib/strings";
+
+const t = de.leaderboard;
 
 export type LeaderboardRow = {
   display_name: string;
@@ -22,16 +25,16 @@ export function LeaderboardPodium({
   loading: boolean;
   error: boolean;
 }) {
-  if (loading) return <p className="text-sm text-muted-foreground py-3">Loading…</p>;
+  if (loading) return <p className="text-sm text-muted-foreground py-3">{de.common.loading}</p>;
   if (error)
-    return <p className="text-sm text-muted-foreground py-3">Couldn&apos;t load the leaderboard.</p>;
+    return <p className="text-sm text-muted-foreground py-3">{t.failed}</p>;
   if (!rows.length)
-    return <p className="text-sm text-muted-foreground py-3">Nobody has finished a puzzle yet.</p>;
+    return <p className="text-sm text-muted-foreground py-3">{t.empty}</p>;
 
   return (
     <div>
       <p className="mb-3 flex items-center gap-2 text-sm font-semibold">
-        <Trophy size={15} className="text-brand-ink" /> Puzzles solved
+        <Trophy size={15} className="text-brand-ink" /> {t.title}
       </p>
       <div className="flex items-end justify-center gap-2">
         {SLOT.map(({ rank, idx, height, order }) => {
@@ -39,12 +42,12 @@ export function LeaderboardPodium({
           if (!row) return <div key={rank} className={`${order} w-20`} />;
           return (
             <div key={rank} className={`${order} flex w-20 flex-col items-center`}>
-              {/* "(you)" on its own line so truncating a long name can't hide it. */}
+              {/* "(du)" on its own line so truncating a long name can't hide it. */}
               <span className="mb-1 flex max-w-full flex-col items-center text-xs font-semibold leading-tight">
                 <span className="max-w-full truncate" title={row.display_name}>
                   {row.display_name}
                 </span>
-                {row.is_me && <span className="font-normal text-muted-foreground">(you)</span>}
+                {row.is_me && <span className="font-normal text-muted-foreground">{t.you}</span>}
               </span>
               <div
                 className={`${height} flex w-full items-start justify-center rounded-t-lg border border-border pt-2 ${

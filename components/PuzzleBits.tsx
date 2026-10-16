@@ -1,4 +1,5 @@
 import { type PuzzleData } from "@/lib/crossword";
+import { de } from "@/lib/strings";
 
 // The puzzle's real block pattern with no letters, so a preview never gives answers away.
 export function PuzzleThumb({ puzzle, solved = false }: { puzzle: PuzzleData; solved?: boolean }) {
@@ -16,8 +17,8 @@ export function PuzzleThumb({ puzzle, solved = false }: { puzzle: PuzzleData; so
 }
 
 export function categoryLabel(puzzle: PuzzleData) {
-  if (puzzle.category === "standard") return "Standard";
-  return puzzle.authorName ? `From ${puzzle.authorName}` : "From the family";
+  if (puzzle.category === "standard") return de.puzzle.standard;
+  return puzzle.authorName ? de.puzzle.fromAuthor(puzzle.authorName) : de.puzzle.family;
 }
 
 export function CategoryTag({ puzzle }: { puzzle: PuzzleData }) {

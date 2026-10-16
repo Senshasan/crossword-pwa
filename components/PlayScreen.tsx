@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, Clock3, RotateCcw, X } from "lucide-react";
 import { type Clue, type PuzzleData } from "@/lib/crossword";
 import { CategoryTag } from "@/components/PuzzleBits";
+import { de } from "@/lib/strings";
+
+const t = de.play;
 
 const keyFor = (row: number, col: number) => `${row}:${col}`;
 
@@ -89,9 +92,9 @@ export function PlayScreen({
     <main className="min-h-screen bg-background text-foreground pb-safe">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4 sm:px-8 pt-safe">
         <button className="back-link" onClick={onBack}>
-          <ChevronLeft size={18} /> Puzzles
+          <ChevronLeft size={18} /> {t.back}
         </button>
-        <div className="timer" aria-label={`Time ${time}`}>
+        <div className="timer" aria-label={t.time(time)}>
           <Clock3 size={16} /> {time}
         </div>
       </header>
@@ -116,7 +119,7 @@ export function PlayScreen({
           autoCorrect="off"
           spellCheck={false}
           inputMode="text"
-          aria-label="Type crossword letters"
+          aria-label={t.inputLabel}
         />
         <div className="play-layout">
           <div className="grid-wrap">
@@ -124,15 +127,15 @@ export function PlayScreen({
               <p className="clue-text">
                 {activeClue && (
                   <span className="clue-ref">
-                    {activeClue.number} {activeClue.direction === "across" ? "Across" : "Down"}
+                    {t.clueRef(activeClue.number, activeClue.direction)}
                   </span>
                 )}
                 {activeClue?.text}
               </p>
-              <button className="icon-button" onClick={onPrevClue} aria-label="Previous clue">
+              <button className="icon-button" onClick={onPrevClue} aria-label={t.prevClue}>
                 <ChevronLeft size={18} />
               </button>
-              <button className="icon-button" onClick={onNextClue} aria-label="Next clue">
+              <button className="icon-button" onClick={onNextClue} aria-label={t.nextClue}>
                 <ChevronRight size={18} />
               </button>
             </div>
@@ -155,8 +158,8 @@ export function PlayScreen({
                       }}
                       aria-label={
                         cell.isBlocked
-                          ? "Blocked"
-                          : `Row ${r + 1}, column ${c + 1}${answers[key] ? `, ${answers[key]}` : ", empty"}`
+                          ? t.blockedCell
+                          : t.cell(r + 1, c + 1, answers[key] ?? "")
                       }
                       tabIndex={cell.isBlocked ? -1 : 0}
                       disabled={cell.isBlocked}
@@ -170,24 +173,25 @@ export function PlayScreen({
             </div>
             <div className="grid-controls">
               <button className="secondary-button" onClick={onCheckWord}>
-                Check word
+                {t.checkWord}
               </button>
               <button className="secondary-button" onClick={onCheckGrid}>
-                Check puzzle
+                {t.checkGrid}
               </button>
               <button
                 className="quiet-button"
                 onClick={handleReset}
                 data-armed={resetArmed ? "" : undefined}
               >
-                <RotateCcw size={16} /> {resetArmed ? "Clear grid?" : "Reset"}
+                <RotateCcw size={16} /> {resetArmed ? t.resetConfirm : t.reset}
               </button>
             </div>
+            <p className="mt-3 text-center text-xs text-muted-foreground">{t.umlautHint}</p>
           </div>
           <aside className="clue-card">
             {(["across", "down"] as const).map((dir) => (
               <div className="clue-section" key={dir}>
-                <h2>{dir === "across" ? "Across" : "Down"}</h2>
+                <h2>{dir === "across" ? t.across : t.down}</h2>
                 {active.clues[dir].map((clue) => {
                   const filled = wordKeys(active, clue).every((k) => answers[k]);
                   return (
@@ -210,17 +214,17 @@ export function PlayScreen({
       {modal && (
         <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="solved-title">
           <div className="success-modal">
-            <button ref={closeRef} className="modal-close" onClick={onCloseModal} aria-label="Close">
+            <button ref={closeRef} className="modal-close" onClick={onCloseModal} aria-label={t.close}>
               <X size={18} />
             </button>
             <span className="mx-auto grid size-14 place-items-center rounded-full bg-brand-tint text-brand-ink">
               <Check size={28} strokeWidth={2.5} />
             </span>
             <h2 id="solved-title" className="mt-5">
-              Solved.
+              {t.solvedTitle}
             </h2>
             <p className="mt-2 text-muted-foreground">
-              {active.title} in <span className="font-semibold tabular-nums text-foreground">{time}</span>
+              {active.title} {t.solvedIn} <span className="font-semibold tabular-nums text-foreground">{time}</span>
             </p>
             {active.category === "custom" && active.congratsMessage && (
               <figure className="family-note">
@@ -229,7 +233,7 @@ export function PlayScreen({
               </figure>
             )}
             <button className="primary-button mt-7 w-full" onClick={onBack}>
-              Back to puzzles
+              {t.backToPuzzles}
             </button>
           </div>
         </div>

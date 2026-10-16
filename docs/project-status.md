@@ -1,6 +1,6 @@
 # Across & Along — Project Status
 
-Last updated: 2026-10-16 (after Round 3 and the design pass). The latest commit at the time of writing is `c59f4c5`.
+Last updated: 2026-10-17 (after Round 5 Phase A, German UI). The latest commit at the time of writing is `566f4ab`.
 
 Read this first in a new session. `CLAUDE.md` in the repo root holds the standing architecture notes and rules. This file records **what has been done, what state things are in, and what is still open**. Treat the code as the source of truth if the two disagree.
 
@@ -25,6 +25,8 @@ A private, ad-free crossword PWA made as a birthday gift for a friend, played by
 | Backspace not saving | **Fixed** (`b38e7d1`) |
 | Leaderboard migration replay (`DROP FUNCTION` before recreate) | **Fixed** by the user in the migration file |
 | UI and design overhaul | **Done and committed** (`406d0f7`, `c59f4c5`) |
+| Round 5 plan (`docs/implementation-plan-round_2.md`), Phase A: German UI | **Done** (2026-10-17, not yet committed), all strings in `lib/strings.ts` |
+| Round 5 Phases B–E (difficulty, generator, clues, custom) | **Not started** |
 | Phone verification of all of the above | **Pending** (see §6) |
 | Real puzzle content | **Not started.** This is the main remaining task |
 
@@ -123,7 +125,8 @@ Headless Chrome has a minimum window width of about 500 px. For a true 390 px ph
 
 **Do first:** delete the installed app and add it to the Home Screen again (and, if needed, clear the site's data in Safari). Older installs may still hold the pre-Round-3 service worker, and iOS caches icons.
 
-- [ ] **Updates:** a new deploy shows the "A new version is available" bar, and **Reload** applies it.
+- [ ] **German UI (Phase A):** every screen is in German. Typing ä/ö/ü/ß on the iPhone keyboard (long-press on a, o, u or s) shows the "Umlaute: AE, OE, UE · ß: SS" toast and enters no letter. iOS may deliver long-press letters as composed input, which `handleKey` skips, so check this one specifically.
+- [ ] **Updates:** a new deploy shows the "Neue Version verfügbar" bar, and **Neu laden** applies it.
 - [ ] **Layout:** the header clears the status bar on Home and inside a puzzle.
 - [ ] **Browse:** every puzzle is listed.
 - [ ] **Install hint:** hidden in the installed app, still shown in plain Safari.
@@ -135,11 +138,11 @@ Headless Chrome has a minimum window width of about 500 px. For a true 390 px ph
 - [ ] **Check feedback:** a wrong letter turns red with the letter still visible, then clears.
 - [ ] **Completion:** a solved puzzle stays solved after Check puzzle, Reset, or reopening it, and its timer doesn't run.
 - [ ] **Backspace:** deletions survive leaving and reopening the puzzle.
-- [ ] **Reset:** needs a second tap ("Clear grid?").
+- [ ] **Reset:** needs a second tap ("Gitter leeren?").
 - [ ] **Theme:** matches the phone's light/dark setting, and the toggle remembers your choice.
-- [ ] **Leaderboard:** with two or more accounts, the podium order reads 2nd | 1st | 3rd, and your own column shows "(you)".
+- [ ] **Leaderboard:** with two or more accounts, the podium order reads 2nd | 1st | 3rd, and your own column shows "(du)".
 - [ ] **Icon:** the new mark appears on the home screen.
-- [ ] **Errors:** with no network at sign-in, you get the "Couldn't load your puzzles." screen, and **Try again** works.
+- [ ] **Errors:** with no network at sign-in, you get the "Deine Rätsel konnten nicht geladen werden." screen, and **Erneut versuchen** works.
 
 ---
 

@@ -2,6 +2,9 @@ import { ArrowRight, ChevronRight, Share } from "lucide-react";
 import { type PuzzleData } from "@/lib/crossword";
 import { PuzzleCard } from "@/components/PuzzleCard";
 import { CategoryTag, PuzzleThumb } from "@/components/PuzzleBits";
+import { de } from "@/lib/strings";
+
+const t = de.home;
 
 export function HomeScreen({
   puzzles,
@@ -26,24 +29,23 @@ export function HomeScreen({
       <div className="hero">
         <div>
           <h1>
-            A little time together, <em>one square at a time.</em>
+            {t.heroLead}
+            <em>{t.heroEmphasis}</em>
           </h1>
           <p className="mt-5 max-w-md text-[17px] leading-7 text-muted-foreground">
-            A free, ad-free crossword collection made for family and friends.
+            {t.subtitle}
           </p>
         </div>
         {!isStandalone && (
           <div className="hero-note">
             <Share size={18} />
-            <p>
-              On iPhone? Use Safari&apos;s Share menu to add this app to your Home Screen.
-            </p>
+            <p>{t.installHint}</p>
           </div>
         )}
       </div>
 
       <div className="section-heading mt-14">
-        <h2>{allSolved ? "Every puzzle solved" : "Pick up where you left off"}</h2>
+        <h2>{allSolved ? t.allSolved : t.continue}</h2>
       </div>
       <button className="continue-card" onClick={() => onOpen(nextPuzzle)}>
         <PuzzleThumb puzzle={nextPuzzle} solved={completed.includes(nextPuzzle.id)} />
@@ -54,7 +56,7 @@ export function HomeScreen({
           </div>
           {teaser && !allSolved && (
             <p className="teaser mt-2 truncate">
-              {teaser.number} Across: {teaser.text}
+              {t.teaser(teaser.number, teaser.text)}
             </p>
           )}
         </div>
@@ -64,9 +66,9 @@ export function HomeScreen({
       </button>
 
       <div className="section-heading mt-14">
-        <h2>The collection</h2>
+        <h2>{t.collection}</h2>
         <button className="browse-link" onClick={onBrowse}>
-          See all {puzzles.length} <ChevronRight size={16} />
+          {t.seeAll(puzzles.length)} <ChevronRight size={16} />
         </button>
       </div>
       <div className="puzzle-grid preview-grid">

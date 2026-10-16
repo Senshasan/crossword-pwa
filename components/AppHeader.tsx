@@ -2,6 +2,9 @@ import { useEffect } from "react";
 import { LogOut, Moon, RotateCw, Sun } from "lucide-react";
 import { LeaderboardPodium, type LeaderboardRow } from "@/components/LeaderboardPodium";
 import { BrandMark } from "@/components/BrandMark";
+import { de } from "@/lib/strings";
+
+const t = de.header;
 
 export function AppHeader({
   name,
@@ -47,7 +50,7 @@ export function AppHeader({
 
   return (
     <header className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5 sm:px-8 pt-safe">
-      <button className="flex items-center gap-3 rounded-xl" onClick={onHome} aria-label="Across & Along, home">
+      <button className="flex items-center gap-3 rounded-xl" onClick={onHome} aria-label={t.home}>
         <BrandMark />
         <span className="wordmark">Across &amp; Along</span>
       </button>
@@ -55,7 +58,7 @@ export function AppHeader({
         <button
           className="icon-button"
           onClick={onToggleTheme}
-          aria-label={dark ? "Switch to light theme" : "Switch to dark theme"}
+          aria-label={dark ? t.lightTheme : t.darkTheme}
         >
           {dark ? <Sun size={18} /> : <Moon size={18} />}
         </button>
@@ -63,7 +66,7 @@ export function AppHeader({
           <button
             className="avatar"
             onClick={() => onMenuOpenChange(!menuOpen)}
-            aria-label="Account"
+            aria-label={t.account}
             aria-haspopup="menu"
             aria-expanded={menuOpen}
           >
@@ -88,7 +91,7 @@ export function AppHeader({
                 }}
                 disabled={refreshing}
               >
-                <RotateCw size={16} /> Refresh
+                <RotateCw size={16} /> {de.common.refresh}
               </button>
               <button
                 className="quiet-button w-full"
@@ -97,7 +100,7 @@ export function AppHeader({
                   onSignOut();
                 }}
               >
-                <LogOut size={16} /> Sign out
+                <LogOut size={16} /> {t.signOut}
               </button>
             </div>
           )}

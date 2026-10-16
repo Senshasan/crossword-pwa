@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CloudOff, Loader2, RotateCw } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { type Clue, type Direction, type PuzzleData } from "@/lib/crossword";
+import { de, formatSolveTime } from "@/lib/strings";
 
 import { useAuth } from "@/hooks/useAuth";
 import { usePuzzles } from "@/hooks/usePuzzles";
@@ -178,7 +179,7 @@ export default function Page() {
 
   const activeClue = active.id ? findActiveClue(active, cursor, direction) : undefined;
   const wordCells = activeClue ? getWordCells(active, activeClue) : [];
-  const time = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+  const time = formatSolveTime(seconds);
 
   async function openPuzzle(puzzle: PuzzleData) {
     if (!puzzle.id) return;
@@ -269,6 +270,12 @@ export default function Page() {
       setLetter(event.key);
       return;
     }
+    // Answers are A–Z only (Ä→AE, ß→SS): explain instead of entering a letter.
+    if (/^[äöüÄÖÜß]$/.test(event.key)) {
+      event.preventDefault();
+      showToast(de.play.umlautHint);
+      return;
+    }
     if (event.key === "Backspace") {
       event.preventDefault();
       cancelPendingCheck();
@@ -334,7 +341,7 @@ export default function Page() {
   }
 
   // Wrong letters flash red with the letter still visible, then clear after 800ms.
-  function checkCells(cells: { row: number; col: number }[], scope: "Word" | "Grid") {
+  function checkCells(cells: { row: number; col: number }[], scope: "word" | "grid") {
     cancelPendingCheck();
     const filled = cells.filter((c) => answers[keyFor(c.row, c.col)]);
     const wrongs = new Set(
@@ -344,14 +351,15 @@ export default function Page() {
     );
 
     if (wrongs.size === 0) {
-      if (!filled.length) showToast("Nothing to check yet.");
-      else if (filled.length === cells.length) showToast(`${scope} is correct!`);
-      else showToast("No mistakes so far.");
+      if (!filled.length) showToast(de.play.nothingToCheck);
+      else if (filled.length === cells.length)
+        showToast(scope === "word" ? de.play.wordCorrect : de.play.gridCorrect);
+      else showToast(de.play.noMistakes);
       return;
     }
 
     setWrongCells(wrongs);
-    showToast(wrongs.size === 1 ? "1 letter isn't right." : `${wrongs.size} letters aren't right.`);
+    showToast(de.play.lettersWrong(wrongs.size));
     const done = isDone;
     checkTimerRef.current = window.setTimeout(() => {
       checkTimerRef.current = null;
@@ -366,11 +374,11 @@ export default function Page() {
   }
 
   function checkWord() {
-    checkCells(wordCells, "Word");
+    checkCells(wordCells, "word");
   }
 
   function checkGrid() {
-    checkCells(allCells(active), "Grid");
+    checkCells(allCells(active), "grid");
   }
 
   function handleNextClue() {
@@ -417,9 +425,9 @@ export default function Page() {
           <span className="grid size-14 place-items-center rounded-2xl bg-family-tint text-family-ink">
             <CloudOff size={24} />
           </span>
-          <h1 className="mt-6">Couldn&apos;t load your puzzles.</h1>
+          <h1 className="mt-6">{de.app.loadFailedTitle}</h1>
           <p className="mt-3 text-[15px] leading-6 text-muted-foreground">
-            Check your connection and try again. Your progress is saved.
+            {de.app.loadFailedText}
           </p>
           <button
             className="primary-button mt-6 w-full"
@@ -427,7 +435,7 @@ export default function Page() {
             disabled={refreshing}
           >
             {refreshing ? <Loader2 className="animate-spin" size={16} /> : <RotateCw size={16} />}
-            {refreshing ? "Trying again…" : "Try again"}
+            {refreshing ? de.app.retrying : de.common.retry}
           </button>
         </div>
       </main>
@@ -438,9 +446,9 @@ export default function Page() {
       <main className="auth-shell">
         <div className="auth-card">
           <BrandMark className="brand-mark large" />
-          <h1 className="mt-6">Your collection is getting ready</h1>
+          <h1 className="mt-6">{de.app.emptyTitle}</h1>
           <p className="mt-3 text-[15px] leading-6 text-muted-foreground">
-            No puzzles have been added yet.
+            {de.app.emptyText}
           </p>
           <button
             className="secondary-button mt-6 w-full"
@@ -448,7 +456,7 @@ export default function Page() {
             disabled={refreshing}
           >
             {refreshing ? <Loader2 className="animate-spin" size={16} /> : <RotateCw size={16} />}
-            {refreshing ? "Checking…" : "Refresh"}
+            {refreshing ? de.app.checking : de.common.refresh}
           </button>
         </div>
       </main>
@@ -515,9 +523,9 @@ export default function Page() {
       {error && (
         <div role="alert" className="refresh-notice">
           <CloudOff size={18} />
-          <p className="text-sm">Couldn&apos;t refresh. Showing your puzzles from earlier.</p>
+          <p className="text-sm">{de.app.refreshFailed}</p>
           <button className="browse-link" onClick={() => void refetch()} disabled={refreshing}>
-            {refreshing ? "Trying…" : "Try again"}
+            {refreshing ? de.app.retryingShort : de.common.retry}
           </button>
         </div>
       )}
