@@ -28,7 +28,8 @@ export function usePuzzleProgress(
   user: User | null,
   active: PuzzleData,
   view: "home" | "browse" | "play",
-  modal: boolean
+  modal: boolean,
+  isCompleted: boolean
 ) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [seconds, setSeconds] = useState(0);
@@ -43,7 +44,7 @@ export function usePuzzleProgress(
   const secondsRef = useRef(0);
 
   useEffect(() => {
-    if (view !== "play" || modal) return;
+    if (view !== "play" || modal || isCompleted) return;
     const timer = window.setInterval(() => {
       setSeconds((s) => {
         secondsRef.current = s + 1;
@@ -51,7 +52,7 @@ export function usePuzzleProgress(
       });
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [view, modal]);
+  }, [view, modal, isCompleted]);
 
   async function flushProgress() {
     const pending = pendingSave.current;

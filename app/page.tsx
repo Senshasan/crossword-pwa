@@ -8,6 +8,7 @@ import {
   LogOut,
   Moon,
   Sun,
+  Loader2,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { type Clue, type Direction, type PuzzleData } from "@/lib/crossword";
@@ -15,12 +16,14 @@ import { type Clue, type Direction, type PuzzleData } from "@/lib/crossword";
 import { useAuth } from "@/hooks/useAuth";
 import { usePuzzles } from "@/hooks/usePuzzles";
 import { usePuzzleProgress } from "@/hooks/usePuzzleProgress";
+import { useServiceWorker } from "@/hooks/useServiceWorker";
 
 import { AuthScreen } from "@/components/AuthScreen";
 import { ProfileScreen } from "@/components/ProfileScreen";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { PuzzleCard } from "@/components/PuzzleCard";
 import { PlayScreen } from "@/components/PlayScreen";
+import { UpdateBanner } from "@/components/UpdateBanner";
 
 const keyFor = (row: number, col: number) => `${row}:${col}`;
 const allCells = (p: PuzzleData) =>
@@ -38,9 +41,11 @@ const emptyPuzzle: PuzzleData = {
 
 export default function Page() {
   const supabase = useMemo(() => createClient(), []);
+  // checkForUpdate is wired into pull-to-refresh in Phase 5.
+  const { updateReady, applyUpdate, checkForUpdate } = useServiceWorker();
   
   const { user, authChecked, profileReady, name, saveProfile } = useAuth(supabase);
-  const { puzzles, puzzleLoading, completed, setCompleted } = usePuzzles(supabase, user?.id);
+  const { puzzles, puzzleLoading, puzzleError, completed, setCompleted, refetch } = usePuzzles(supabase, user?.id);
 
   const [dark, setDark] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -52,8 +57,16 @@ export default function Page() {
   const [modal, setModal] = useState(false);
   const [wrongCells, setWrongCells] = useState<Set<string>>(new Set());
   const [toastMsg, setToastMsg] = useState("");
+  const [isStandalone, setIsStandalone] = useState(false);
+  
+  const [leaderboard, setLeaderboard] = useState<{display_name: string, completed_count: number}[]>([]);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+
+  const [touchStartY, setTouchStartY] = useState<number | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const checkTimerRef = useRef<number | null>(null);
 
   const {
     answers,
@@ -63,7 +76,24 @@ export default function Page() {
     saveProgress,
     loadPuzzleProgress,
     resetProgress,
-  } = usePuzzleProgress(supabase, user, active, view, modal);
+  } = usePuzzleProgress(supabase, user, active, view, modal, completed.includes(active.id));
+
+  useEffect(() => {
+    setIsStandalone(
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as any).standalone === true
+    );
+  }, []);
+
+  useEffect(() => {
+    if (menuOpen) {
+      setLeaderboardLoading(true);
+      supabase.rpc('get_leaderboard', { limit_count: 3 }).then(({ data }) => {
+        if (data) setLeaderboard(data);
+        setLeaderboardLoading(false);
+      });
+    }
+  }, [menuOpen, supabase]);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
@@ -89,9 +119,10 @@ export default function Page() {
   }, [menuOpen]);
 
   useEffect(() => {
-    if ("serviceWorker" in navigator)
-      navigator.serviceWorker.register("/sw.js").catch(() => undefined);
-  }, []);
+    return () => {
+      if (checkTimerRef.current) clearTimeout(checkTimerRef.current);
+    };
+  }, [active.id]);
 
   const filtered = puzzles.filter(
     (p) => filter === "all" || p.category === filter,
@@ -115,6 +146,11 @@ export default function Page() {
     }
     return cells;
   }
+  
+  function firstEmptyCell(clue: Clue) {
+    const cells = getWordCells(active, clue);
+    return cells.find(c => !answers[keyFor(c.row, c.col)]) ?? cells[0];
+  }
 
   function findActiveClue(
     puzzle: PuzzleData,
@@ -134,6 +170,7 @@ export default function Page() {
 
   async function openPuzzle(puzzle: PuzzleData) {
     if (!puzzle.id) return;
+    if (checkTimerRef.current) clearTimeout(checkTimerRef.current);
     setActive(puzzle);
     setView("play");
     setModal(false);
@@ -159,7 +196,13 @@ export default function Page() {
     )
       setDirection((d) => (d === "across" ? "down" : "across"));
     setCursor({ row, col });
-    setWrongCells(new Set());
+    if (wrongCells.has(keyFor(row, col))) {
+      setWrongCells((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(keyFor(row, col));
+        return newSet;
+      });
+    }
     inputRef.current?.focus();
   }
 
@@ -173,6 +216,7 @@ export default function Page() {
     setAnswers(next);
     
     setWrongCells((prev) => {
+      if (!prev.has(keyFor(cursor.row, cursor.col))) return prev;
       const newSet = new Set(prev);
       newSet.delete(keyFor(cursor.row, cursor.col));
       return newSet;
@@ -277,15 +321,25 @@ export default function Page() {
         checkedCount++;
         if (current !== expected) {
           wrongs.add(key);
-          next[key] = "";
           allCorrect = false;
         }
       }
     });
 
-    setAnswers(next);
     setWrongCells(wrongs);
-    saveProgress(next, false);
+    
+    if (checkTimerRef.current) clearTimeout(checkTimerRef.current);
+    if (wrongs.size > 0) {
+      checkTimerRef.current = window.setTimeout(() => {
+        setAnswers((prev) => {
+          const cleared = { ...prev };
+          wrongs.forEach((k) => { cleared[k] = ""; });
+          saveProgress(cleared, false);
+          return cleared;
+        });
+        setWrongCells(new Set());
+      }, 800);
+    }
     
     if (allCorrect && checkedCount === wordCells.length) {
       showToast("Word is correct!");
@@ -307,15 +361,25 @@ export default function Page() {
         checkedCount++;
         if (current !== expected) {
           wrongs.add(key);
-          next[key] = "";
           allCorrect = false;
         }
       }
     });
 
-    setAnswers(next);
     setWrongCells(wrongs);
-    saveProgress(next, false);
+
+    if (checkTimerRef.current) clearTimeout(checkTimerRef.current);
+    if (wrongs.size > 0) {
+      checkTimerRef.current = window.setTimeout(() => {
+        setAnswers((prev) => {
+          const cleared = { ...prev };
+          wrongs.forEach((k) => { cleared[k] = ""; });
+          saveProgress(cleared, false);
+          return cleared;
+        });
+        setWrongCells(new Set());
+      }, 800);
+    }
 
     if (allCorrect && checkedCount === allCells(active).length) {
       showToast("Grid is correct!");
@@ -328,10 +392,13 @@ export default function Page() {
     );
     if (!activeClue) return;
     const idx = allClues.findIndex(c => c.number === activeClue.number && c.direction === activeClue.direction);
-    const next = allClues[(idx + 1) % allClues.length];
-    setCursor({ row: next.row, col: next.col });
-    setDirection(next.direction);
-    inputRef.current?.focus();
+    const nextClue = allClues[(idx + 1) % allClues.length];
+    const cell = firstEmptyCell(nextClue);
+    if (cell) {
+      setCursor({ row: cell.row, col: cell.col });
+      setDirection(nextClue.direction);
+      inputRef.current?.focus();
+    }
   }
 
   function handlePrevClue() {
@@ -340,16 +407,39 @@ export default function Page() {
     );
     if (!activeClue) return;
     const idx = allClues.findIndex(c => c.number === activeClue.number && c.direction === activeClue.direction);
-    const prev = allClues[(idx - 1 + allClues.length) % allClues.length];
-    setCursor({ row: prev.row, col: prev.col });
-    setDirection(prev.direction);
-    inputRef.current?.focus();
+    const prevClue = allClues[(idx - 1 + allClues.length) % allClues.length];
+    const cell = firstEmptyCell(prevClue);
+    if (cell) {
+      setCursor({ row: cell.row, col: cell.col });
+      setDirection(prevClue.direction);
+      inputRef.current?.focus();
+    }
   }
 
   if (!authChecked) return <LoadingScreen />;
   if (!user) return <AuthScreen supabase={supabase} />;
   if (!profileReady) return <ProfileScreen onSave={saveProfile} />;
   if (puzzleLoading) return <LoadingScreen />;
+
+  if (puzzleError)
+    return (
+      <main className="auth-shell">
+        <div className="auth-card">
+          <span className="brand-mark bg-red-600">
+            <Grid2X2 size={19} />
+          </span>
+          <h1 className="mt-5 text-2xl font-semibold">
+            Oops, something went wrong
+          </h1>
+          <p className="mt-3 text-sm text-muted-foreground">
+            {puzzleError}
+          </p>
+          <button className="primary-button mt-6" onClick={refetch}>
+            Try again
+          </button>
+        </div>
+      </main>
+    );
 
   if (!puzzles.length)
     return (
@@ -364,6 +454,9 @@ export default function Page() {
           <p className="mt-3 text-sm text-muted-foreground">
             No puzzles have been added yet.
           </p>
+          <button className="secondary-button mt-6 w-full" onClick={refetch}>
+            Refresh
+          </button>
         </div>
       </main>
     );
@@ -385,7 +478,8 @@ export default function Page() {
           onCell={focusCell}
           onDirection={setDirection}
           onClue={(clue: Clue) => {
-            setCursor({ row: clue.row, col: clue.col });
+            const cell = firstEmptyCell(clue);
+            if (cell) setCursor({ row: cell.row, col: cell.col });
             setDirection(clue.direction);
             inputRef.current?.focus();
           }}
@@ -404,12 +498,30 @@ export default function Page() {
             {toastMsg}
           </div>
         )}
+        {updateReady && <UpdateBanner onReload={applyUpdate} />}
       </div>
     );
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <header className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5 sm:px-8">
+    <main 
+      className="min-h-screen bg-background text-foreground pull-container"
+      onTouchStart={(e) => {
+        if (window.scrollY === 0) setTouchStartY(e.touches[0].clientY);
+      }}
+      onTouchMove={(e) => {
+        if (touchStartY !== null && e.touches[0].clientY - touchStartY > 70) {
+          setIsRefreshing(true);
+        }
+      }}
+      onTouchEnd={() => {
+        if (isRefreshing) {
+          refetch();
+          setTimeout(() => setIsRefreshing(false), 1000);
+        }
+        setTouchStartY(null);
+      }}
+    >
+      <header className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5 sm:px-8 pt-safe">
         <button
           className="flex items-center gap-3"
           onClick={() => setView("home")}
@@ -417,9 +529,10 @@ export default function Page() {
           <span className="brand-mark">
             <Grid2X2 size={19} />
           </span>
-          <span className="text-lg font-semibold">Across & Along</span>
+          <span className="text-lg font-semibold hidden sm:inline">Across & Along</span>
         </button>
         <div className="flex items-center gap-2">
+          {isRefreshing && <Loader2 className="animate-spin text-muted-foreground mr-2" size={18} />}
           <button
             className="icon-button"
             onClick={() => setDark(!dark)}
@@ -439,12 +552,41 @@ export default function Page() {
             </button>
             {menuOpen && (
               <div className="account-menu">
-                <div className="px-2 pt-1 pb-2">
+                <div className="px-2 pt-1 pb-2 border-b border-border">
                   <p className="font-semibold">{name}</p>
                   <p className="text-sm text-muted-foreground">{user?.email}</p>
                 </div>
+                
+                <div className="px-2 py-2">
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Leaderboard</p>
+                  {leaderboardLoading ? (
+                    <div className="flex justify-center p-2"><Loader2 className="animate-spin text-muted-foreground" size={16} /></div>
+                  ) : (
+                    <div className="podium-layout">
+                      {leaderboard[1] && (
+                        <div className="podium-place place-2">
+                          <div className="podium-avatar bg-slate-300 text-slate-800">{leaderboard[1].display_name.slice(0, 2).toUpperCase()}</div>
+                          <span className="text-xs font-semibold">{leaderboard[1].completed_count}</span>
+                        </div>
+                      )}
+                      {leaderboard[0] && (
+                        <div className="podium-place place-1">
+                          <div className="podium-avatar bg-yellow-400 text-yellow-900">{leaderboard[0].display_name.slice(0, 2).toUpperCase()}</div>
+                          <span className="text-xs font-bold">{leaderboard[0].completed_count}</span>
+                        </div>
+                      )}
+                      {leaderboard[2] && (
+                        <div className="podium-place place-3">
+                          <div className="podium-avatar bg-orange-300 text-orange-900">{leaderboard[2].display_name.slice(0, 2).toUpperCase()}</div>
+                          <span className="text-xs font-semibold">{leaderboard[2].completed_count}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 <button
-                  className="secondary-button w-full"
+                  className="secondary-button w-full mt-2"
                   onClick={() => {
                     setMenuOpen(false);
                     supabase.auth.signOut();
@@ -459,19 +601,19 @@ export default function Page() {
       </header>
 
       {view === "browse" ? (
-        <section className="mx-auto max-w-6xl px-5 pb-16 sm:px-8 mt-8">
-          <div className="flex items-center justify-between mb-8">
+        <section className="mx-auto max-w-6xl px-5 pb-safe sm:px-8 mt-8">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
             <h1 className="text-3xl font-semibold">Browse Puzzles</h1>
-            <button className="browse-link" onClick={() => setView("home")}>
+            <button className="browse-link shrink-0 whitespace-nowrap" onClick={() => setView("home")}>
               Back to Home
             </button>
           </div>
           
-          <div className="flex items-center gap-4 mb-8 border-b border-border">
+          <div className="flex items-center gap-4 mb-8 border-b border-border overflow-x-auto">
             {(["all", "standard", "custom"] as const).map((f) => (
               <button
                 key={f}
-                className={`pb-3 text-sm font-medium border-b-2 ${
+                className={`pb-3 text-sm font-medium border-b-2 whitespace-nowrap ${
                   filter === f
                     ? "border-primary text-primary"
                     : "border-transparent text-muted-foreground hover:text-foreground"
@@ -495,7 +637,7 @@ export default function Page() {
           </div>
         </section>
       ) : (
-        <section className="mx-auto max-w-6xl px-5 pb-16 sm:px-8">
+        <section className="mx-auto max-w-6xl px-5 pb-safe sm:px-8">
           <div className="hero">
             <div>
               <p className="eyebrow sage">Your private collection</p>
@@ -506,22 +648,24 @@ export default function Page() {
                 A free, ad-free crossword collection made for family and friends.
               </p>
             </div>
-            <div className="hero-note">
-              <BookOpen size={18} />
-              <p className="text-sm leading-5">
-                On iPhone? Use Safari&apos;s Share menu to add this app to your
-                Home Screen.
-              </p>
-            </div>
+            {!isStandalone && (
+              <div className="hero-note">
+                <BookOpen size={18} />
+                <p className="text-sm leading-5">
+                  On iPhone? Use Safari&apos;s Share menu to add this app to your
+                  Home Screen.
+                </p>
+              </div>
+            )}
           </div>
-          <div className="mt-14 flex items-end justify-between">
+          <div className="mt-14 flex items-end justify-between gap-4">
             <div>
               <p className="eyebrow">Continue</p>
               <h2 className="mt-2 text-2xl font-semibold">
                 Pick up where you left off
               </h2>
             </div>
-            <button className="browse-link" onClick={() => setView("browse")}>
+            <button className="browse-link shrink-0 whitespace-nowrap" onClick={() => setView("browse")}>
               Browse all <ChevronRight size={16} />
             </button>
           </div>
@@ -546,16 +690,16 @@ export default function Page() {
               <ChevronRight size={23} />
             </span>
           </button>
-          <div className="section-heading mt-14">
+          <div className="section-heading mt-14 gap-4">
             <div>
               <p className="eyebrow">The collection</p>
               <h2 className="mt-2 text-2xl font-semibold">All puzzles</h2>
             </div>
-            <button className="browse-link" onClick={() => setView("browse")}>
+            <button className="browse-link shrink-0 whitespace-nowrap" onClick={() => setView("browse")}>
               See collection <ChevronRight size={16} />
             </button>
           </div>
-          <div className="puzzle-grid">
+          <div className="puzzle-grid preview-grid">
             {puzzles.slice(0, 3).map((puzzle) => (
               <PuzzleCard
                 key={puzzle.id}
@@ -567,6 +711,7 @@ export default function Page() {
           </div>
         </section>
       )}
+      {updateReady && <UpdateBanner onReload={applyUpdate} />}
     </main>
   );
 }

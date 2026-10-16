@@ -13,3 +13,6 @@ __v0_jsx-dev-runtime.ts
 node_modules
 .next/
 .DS_Store
+
+# Generated from sw-src/sw.js by scripts/stamp-sw.mjs
+public/sw.js

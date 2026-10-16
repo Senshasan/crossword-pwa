@@ -1,11 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import type { createClient } from "@/lib/supabase/client";
 import { type PuzzleData, type PuzzleRow, mapPuzzle } from "@/lib/crossword";
 
 export function usePuzzles(supabase: ReturnType<typeof createClient>, userId: string | undefined) {
   const [puzzles, setPuzzles] = useState<PuzzleData[]>([]);
   const [puzzleLoading, setPuzzleLoading] = useState(true);
+  const [puzzleError, setPuzzleError] = useState<string | null>(null);
   const [completed, setCompleted] = useState<string[]>([]);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  const refetch = useCallback(() => {
+    setRefreshTrigger((prev) => prev + 1);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -17,6 +23,7 @@ export function usePuzzles(supabase: ReturnType<typeof createClient>, userId: st
       }
 
       setPuzzleLoading(true);
+      setPuzzleError(null);
 
       const [progressResponse, puzzlesResponse] = await Promise.all([
         supabase
@@ -31,7 +38,10 @@ export function usePuzzles(supabase: ReturnType<typeof createClient>, userId: st
 
       if (!mounted) return;
 
-      if (progressResponse.data) {
+      if (progressResponse.error) {
+        console.error("Error fetching progress:", progressResponse.error);
+        setPuzzleError("Failed to load your progress.");
+      } else if (progressResponse.data) {
         setCompleted(
           progressResponse.data
             .filter((row: any) => row.completed)
@@ -39,7 +49,10 @@ export function usePuzzles(supabase: ReturnType<typeof createClient>, userId: st
         );
       }
 
-      if (puzzlesResponse.data) {
+      if (puzzlesResponse.error) {
+        console.error("Error fetching puzzles:", puzzlesResponse.error);
+        setPuzzleError("Failed to load puzzles. Please check your connection or database schema.");
+      } else if (puzzlesResponse.data) {
         setPuzzles(
           (puzzlesResponse.data as PuzzleRow[])
             .map(mapPuzzle)
@@ -55,7 +68,7 @@ export function usePuzzles(supabase: ReturnType<typeof createClient>, userId: st
     return () => {
       mounted = false;
     };
-  }, [supabase, userId]);
+  }, [supabase, userId, refreshTrigger]);
 
-  return { puzzles, puzzleLoading, completed, setCompleted };
+  return { puzzles, puzzleLoading, puzzleError, completed, setCompleted, refetch };
 }

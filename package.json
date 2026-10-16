@@ -4,7 +4,9 @@
   "private": true,
   "packageManager": "pnpm@12.3.4",
   "scripts": {
+    "predev": "node scripts/stamp-sw.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/stamp-sw.mjs",
     "build": "next build",
     "start": "next start"
   },
